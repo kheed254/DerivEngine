@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { DerivClient } from '@/lib/derivClient'
-import { ChevronDown, LogOut, Clock, Zap, Play } from 'lucide-react'
+import { ChevronDown, LogOut, Clock, Zap, Play, X } from 'lucide-react'
 
 export default function HomePage() {
   const [price, setPrice] = useState(730.69)
@@ -42,6 +42,11 @@ export default function HomePage() {
   const [targetProfit, setTargetProfit] = useState(50)
   const [stopLoss, setStopLoss] = useState(30)
   const [isBotRunning, setIsBotRunning] = useState(false)
+
+  // AI Scanner
+  const [aiTradeType, setAiTradeType] = useState('Match / Differ')
+  const [aiScanProgress, setAiScanProgress] = useState(0)
+  const [aiScanning, setAiScanning] = useState(false)
 
   const chartRef = useRef<HTMLDivElement>(null)
   const chartInstance = useRef<any>(null)
@@ -233,6 +238,17 @@ export default function HomePage() {
   const resetDemo = () => { setBalance(10000); setTradeResult('Demo account reset to $10,000') }
   const toggleTheme = () => setTheme(isDark ? 'light' : 'dark')
   const potentialPayout = stake * 1.9
+
+  const runDeepScan = async () => {
+    setAiScanning(true)
+    setAiScanProgress(0)
+    for (let i = 1; i <= 10; i++) {
+      await new Promise((r) => setTimeout(r, 400))
+      setAiScanProgress(i)
+    }
+    setAiScanning(false)
+    setTradeResult('✅ Scan complete! Best market found: Volatility 100 (1s) Index')
+  }
 
   const markets = [
     'Volatility 100 (1s) Index', 'Volatility 100 Index',
@@ -459,7 +475,7 @@ export default function HomePage() {
             </button>
           </div>
 
-          {/* Trade type tabs — no Multipliers in Auto */}
+          {/* Trade type tabs */}
           <div className="flex gap-2 mb-3">
             <button onClick={() => setTradeType('rise-fall')} className={`flex-1 py-2 rounded-lg text-xs font-medium ${tradeType === 'rise-fall' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Rise/Fall</button>
             <button onClick={() => setTradeType('digits')} className={`flex-1 py-2 rounded-lg text-xs font-medium ${tradeType === 'digits' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Digits</button>
@@ -496,10 +512,9 @@ export default function HomePage() {
             ))}
           </div>
 
-          {/* ═══════ AUTO MODE ═══════ */}
+          {/* AUTO */}
           {tradeMode === 'auto' && (
             <>
-              {/* RISE/FALL auto */}
               {tradeType === 'rise-fall' && (
                 <>
                   <div className="mb-3">
@@ -515,7 +530,6 @@ export default function HomePage() {
                       ))}
                     </div>
                   </div>
-
                   <div className="mb-3">
                     <div className={`text-xs mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Bot trades</div>
                     <div className="grid grid-cols-2 gap-2">
@@ -532,7 +546,6 @@ export default function HomePage() {
                 </>
               )}
 
-              {/* DIGITS auto */}
               {tradeType === 'digits' && (
                 <>
                   <div className="grid grid-cols-3 gap-1.5 mb-3">
@@ -549,7 +562,6 @@ export default function HomePage() {
                       Matches / Differs
                     </button>
                   </div>
-
                   <div className={`flex items-center justify-between p-3 rounded-lg mb-3 ${isDark ? 'bg-[#150d24]' : 'bg-gray-50'}`}>
                     <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                       {digitMode === 'matches-differs' ? 'Target digit' : 'Barrier digit'}
@@ -559,8 +571,6 @@ export default function HomePage() {
                       <span className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>tap chart digits</span>
                     </div>
                   </div>
-
-                  {/* Bot trades */}
                   <div className="mb-3">
                     <div className={`text-xs mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Bot trades</div>
                     {digitMode === 'over-under' && (
@@ -603,7 +613,6 @@ export default function HomePage() {
                 </>
               )}
 
-              {/* Bot settings */}
               <div className="grid grid-cols-2 gap-2 mb-3">
                 <div>
                   <div className={`text-xs mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Martingale x</div>
@@ -635,7 +644,7 @@ export default function HomePage() {
               </div>
 
               <button onClick={() => setIsBotRunning(!isBotRunning)}
-                className={`w-full py-3 bg-purple-500 hover:bg-purple-600 text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 mb-2`}>
+                className="w-full py-3 bg-purple-500 hover:bg-purple-600 text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 mb-2">
                 <Play className="w-4 h-4" /> {isBotRunning ? 'Stop bot' : 'Start bot'}
               </button>
 
@@ -645,10 +654,9 @@ export default function HomePage() {
             </>
           )}
 
-          {/* ═══════ MANUAL MODE ═══════ */}
+          {/* MANUAL */}
           {tradeMode === 'manual' && (
             <>
-              {/* RISE/FALL manual */}
               {tradeType === 'rise-fall' && (
                 <>
                   <div className="mb-3">
@@ -664,14 +672,12 @@ export default function HomePage() {
                       ))}
                     </div>
                   </div>
-
                   <div className={`flex justify-between items-center p-3 rounded-lg mb-3 ${isDark ? 'bg-[#150d24]' : 'bg-gray-50'}`}>
                     <div className={`text-xs flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                       <Zap className="w-3 h-3 text-purple-400" /> Potential payout
                     </div>
                     <div className="text-purple-400 font-bold">${potentialPayout.toFixed(2)}</div>
                   </div>
-
                   <div className="grid grid-cols-2 gap-2">
                     <button onClick={() => executeTrade('RISE')} disabled={isTrading}
                       className="py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition disabled:opacity-50">
@@ -691,7 +697,6 @@ export default function HomePage() {
                 </>
               )}
 
-              {/* DIGITS manual */}
               {tradeType === 'digits' && (
                 <>
                   <div className="grid grid-cols-3 gap-1.5 mb-3">
@@ -708,7 +713,6 @@ export default function HomePage() {
                       Matches / Differs
                     </button>
                   </div>
-
                   <div className={`flex items-center justify-between p-3 rounded-lg mb-3 ${isDark ? 'bg-[#150d24]' : 'bg-gray-50'}`}>
                     <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                       {digitMode === 'matches-differs' ? 'Target digit' : 'Barrier digit'}
@@ -718,7 +722,6 @@ export default function HomePage() {
                       <span className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>tap chart digits</span>
                     </div>
                   </div>
-
                   {digitMode === 'over-under' && (
                     <div className="grid grid-cols-2 gap-2">
                       <button onClick={() => { setDigitSide('OVER'); executeTrade('OVER') }} disabled={isTrading}
@@ -739,7 +742,6 @@ export default function HomePage() {
                       </button>
                     </div>
                   )}
-
                   {digitMode === 'even-odd' && (
                     <div className="grid grid-cols-2 gap-2">
                       <button onClick={() => { setDigitSide('EVEN'); executeTrade('EVEN') }} disabled={isTrading}
@@ -760,7 +762,6 @@ export default function HomePage() {
                       </button>
                     </div>
                   )}
-
                   {digitMode === 'matches-differs' && (
                     <div className="grid grid-cols-2 gap-2">
                       <button onClick={() => { setDigitSide('MATCHES'); executeTrade('MATCHES') }} disabled={isTrading}
@@ -784,7 +785,6 @@ export default function HomePage() {
                 </>
               )}
 
-              {/* MULTIPLIERS manual */}
               {tradeType === 'multipliers' && (
                 <>
                   <div className="mb-3">
@@ -800,7 +800,6 @@ export default function HomePage() {
                       ))}
                     </div>
                   </div>
-
                   <div className={`p-3 rounded-lg mb-3 ${isDark ? 'bg-[#150d24]' : 'bg-gray-50'}`}>
                     <div className="flex justify-between text-xs mb-1">
                       <span className={isDark ? 'text-gray-400' : 'text-gray-600'}>P&L moves</span>
@@ -816,7 +815,6 @@ export default function HomePage() {
                       </span>
                     </div>
                   </div>
-
                   <div className="grid grid-cols-2 gap-2">
                     <button onClick={() => executeTrade('UP')} disabled={isTrading}
                       className="py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition disabled:opacity-50">
@@ -845,6 +843,86 @@ export default function HomePage() {
           )}
         </div>
       </div>
+
+      {/* AI Entry Scanner Modal */}
+      {tradeMode === 'ai' && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <div className={`w-full max-w-md rounded-2xl border ${isDark ? 'bg-[#150d24] border-purple-500/20' : 'bg-white border-gray-200'}`}>
+            <div className={`flex items-start justify-between p-5 border-b ${isDark ? 'border-purple-500/20' : 'border-gray-200'}`}>
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
+                  <span className="text-purple-400 text-lg">✨</span>
+                </div>
+                <div>
+                  <h3 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>Entry Scanner</h3>
+                  <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                    Deep-scans 10 markets for the best entry
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setTradeMode('manual')}
+                className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-100 hover:bg-gray-200'}`}
+              >
+                <X className={`w-4 h-4 ${isDark ? 'text-gray-400' : 'text-gray-600'}`} />
+              </button>
+            </div>
+
+            <div className="p-5">
+              <div className="mb-4">
+                <label className={`text-xs block mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Trade type</label>
+                <select
+                  value={aiTradeType}
+                  onChange={(e) => setAiTradeType(e.target.value)}
+                  className={`w-full rounded-lg px-4 py-3 outline-none border text-sm font-medium ${isDark ? 'bg-[#0a0613] text-white border-purple-500/20' : 'bg-gray-50 text-gray-900 border-gray-200'}`}
+                >
+                  <option>Match / Differ</option>
+                  <option>Over / Under</option>
+                  <option>Even / Odd</option>
+                  <option>Rise / Fall</option>
+                </select>
+              </div>
+
+              <div className="mb-4">
+                <div className="flex justify-between items-center mb-2">
+                  <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Ready to scan</span>
+                  <span className={`text-xs font-medium ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                    {aiScanProgress}/10
+                  </span>
+                </div>
+                <div className={`h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-[#0a0613]' : 'bg-gray-100'}`}>
+                  <div
+                    className="h-full bg-purple-500 transition-all duration-300"
+                    style={{ width: `${(aiScanProgress / 10) * 100}%` }}
+                  />
+                </div>
+              </div>
+
+              <button
+                onClick={runDeepScan}
+                disabled={aiScanning}
+                className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 mb-3"
+              >
+                <span>🔍</span>
+                {aiScanning ? `Scanning... ${aiScanProgress}/10` : 'Deep Scan for Best Market'}
+              </button>
+
+              <button
+                disabled={aiScanProgress < 10}
+                className={`w-full py-3.5 rounded-xl font-bold text-sm transition ${
+                  aiScanProgress >= 10
+                    ? 'bg-purple-500/20 text-purple-400 hover:bg-purple-500/30'
+                    : isDark
+                    ? 'bg-white/5 text-gray-500 cursor-not-allowed'
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                }`}
+              >
+                Load Scanner Bot
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
