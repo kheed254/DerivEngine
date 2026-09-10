@@ -23,6 +23,7 @@ export default function HomePage() {
   const [closedPositions, setClosedPositions] = useState<any[]>([])
   const [activeTab, setActiveTab] = useState<'open' | 'closed'>('open')
   const [tradeType, setTradeType] = useState<'rise-fall' | 'digits' | 'multipliers'>('rise-fall')
+  const [digitMode, setDigitMode] = useState<'over-under' | 'even-odd' | 'matches-differs'>('over-under')
   const [selectedDigit, setSelectedDigit] = useState<number>(5)
   const [showDashboard, setShowDashboard] = useState(false)
   const [digitHistory] = useState<number[]>([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
@@ -81,7 +82,7 @@ export default function HomePage() {
     setLastDigit(digit)
   }, [selectedMarket, showDashboard])
 
-  // Connect to Deriv for live prices + always-on simulation
+  // Connect to Deriv + always-on simulation
   useEffect(() => {
     let derivClient: DerivClient
     let isMounted = true
@@ -190,7 +191,6 @@ export default function HomePage() {
           throw new Error('No compatible chart series method found')
         }
 
-        // Base starting price depending on market
         const basePrices: { [key: string]: number } = {
           'Volatility 100 (1s) Index': 730,
           'Volatility 100 Index': 1500,
@@ -204,7 +204,6 @@ export default function HomePage() {
           'Volatility 10 Index': 6500,
         }
         const startPrice = basePrices[selectedMarket] || 730
-        // Volatility scale — higher indices swing more
         const volatility = Math.max(1, startPrice * 0.005)
 
         const now = Math.floor(Date.now() / 1000)
@@ -223,7 +222,7 @@ export default function HomePage() {
         chartInstance.current = chart
         priceHistoryRef.current = initialData
 
-        console.log('✅ Chart initialized for', selectedMarket, 'with', initialData.length, 'points')
+        console.log('✅ Chart initialized for', selectedMarket)
       } catch (err) {
         console.error('❌ Chart init error:', err)
       }
@@ -252,7 +251,7 @@ export default function HomePage() {
     }
   }, [showDashboard, isLoggedIn, selectedMarket])
 
-  // Update chart with live price — runs on a 1s ticker
+  // Update chart with live price
   useEffect(() => {
     if (!showDashboard) return
 
@@ -278,7 +277,7 @@ export default function HomePage() {
   }, [showDashboard, price, selectedMarket])
 
   // Execute a trade
-  const executeTrade = async (prediction: 'RISE' | 'FALL' | 'DIGIT') => {
+  const executeTrade = async (prediction: 'RISE' | 'FALL' | 'DIGIT' | 'OVER' | 'UNDER') => {
     setIsTrading(true)
     setTradeResult(null)
 
@@ -289,7 +288,10 @@ export default function HomePage() {
       const contract = {
         id: Math.random().toString(36).substring(2, 10),
         market: selectedMarket,
-        type: prediction === 'DIGIT' ? `Digits ${selectedDigit}` : prediction,
+        type: prediction === 'DIGIT' ? `Digits ${selectedDigit}` : 
+              prediction === 'OVER' ? `Over ${selectedDigit}` :
+              prediction === 'UNDER' ? `Under ${selectedDigit}` :
+              prediction,
         stake: stake,
         entryPrice: price,
         result: result,
@@ -566,7 +568,6 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Chart container */}
           <div
             ref={chartRef}
             className="w-full rounded-lg overflow-hidden"
@@ -646,7 +647,8 @@ export default function HomePage() {
               <input
                 type="number"
                 value={stake}
-                onChange={(e) => setStake(Number(e.target.value))}
+                onChange={(e) => setStake(Math.max(1, Number(e.target.value)))}
+                min={1}
                 className={`flex-1 text-center text-xl font-bold rounded-lg py-3 outline-none border ${isDark ? 'bg-[#150d24] text-white border-purple-500/20' : 'bg-gray-50 text-gray-900 border-gray-200'}`}
               />
               <button
@@ -658,8 +660,9 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-4 gap-2 mb-4">
-            {[1, 5, 10, 25].map((val) => (
+          {/* Quick stake buttons */}
+          <div className="grid grid-cols-6 gap-1.5 mb-2">
+            {[1, 5, 10, 25, 50, 100].map((val) => (
               <button
                 key={val}
                 onClick={() => setStake(val)}
@@ -670,14 +673,21 @@ export default function HomePage() {
             ))}
           </div>
 
+          <div className={`text-right text-xs mb-4 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+            ≈ KES {(stake * 130).toLocaleString()}
+          </div>
+
           {tradeType === 'rise-fall' && (
             <>
-              <div className="grid grid-cols-2 gap-2 mb-4">
+              <div className="grid grid-cols-3 gap-2 mb-4">
                 <button className={`py-2 rounded-lg text-xs font-medium ${isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
                   Over / Under
                 </button>
                 <button className={`py-2 rounded-lg text-xs font-medium ${isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
                   Even / Odd
+                </button>
+                <button className={`py-2 rounded-lg text-xs font-medium ${isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
+                  Matches / Differs
                 </button>
               </div>
 
@@ -704,19 +714,132 @@ export default function HomePage() {
 
           {tradeType === 'digits' && (
             <>
-              <div className={`p-3 rounded-lg mb-4 ${isDark ? 'bg-[#150d24]' : 'bg-gray-50'}`}>
-                <div className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'} mb-1`}>Barrier digit</div>
-                <div className="text-purple-400 font-bold text-lg">{selectedDigit}</div>
+              {/* Digit mode selector */}
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                <button
+                  onClick={() => setDigitMode('over-under')}
+                  className={`py-2 rounded-lg text-xs font-medium ${digitMode === 'over-under' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}
+                >
+                  Over / Under
+                </button>
+                <button
+                  onClick={() => setDigitMode('even-odd')}
+                  className={`py-2 rounded-lg text-xs font-medium ${digitMode === 'even-odd' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}
+                >
+                  Even / Odd
+                </button>
+                <button
+                  onClick={() => setDigitMode('matches-differs')}
+                  className={`py-2 rounded-lg text-xs font-medium ${digitMode === 'matches-differs' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}
+                >
+                  Matches / Differs
+                </button>
               </div>
 
-              <button
-                onClick={() => executeTrade('DIGIT')}
-                disabled={isTrading}
-                className="w-full py-4 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition disabled:opacity-50"
-              >
-                {isTrading ? '...' : `MATCHES ${selectedDigit}`}
-                <div className="text-[10px] font-normal opacity-90">Payout ${(stake * 1.9).toFixed(2)}</div>
-              </button>
+              {/* Barrier digit */}
+              <div className={`flex items-center justify-between p-3 rounded-lg mb-4 ${isDark ? 'bg-[#150d24]' : 'bg-gray-50'}`}>
+                <span className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Barrier digit</span>
+                <div className="flex items-center gap-2">
+                  <span className="w-8 h-8 rounded-lg bg-purple-600 text-white font-bold flex items-center justify-center">
+                    {selectedDigit}
+                  </span>
+                  <span className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>tap chart digits</span>
+                </div>
+              </div>
+
+              {/* Trade buttons based on mode */}
+              {digitMode === 'over-under' && (
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => executeTrade('OVER')}
+                    disabled={isTrading}
+                    className="py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold text-sm transition disabled:opacity-50"
+                  >
+                    <div className="flex items-center justify-between px-2">
+                      <span className="font-bold">OVER {selectedDigit}</span>
+                      <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+138%</span>
+                    </div>
+                    <div className="text-[10px] font-normal opacity-90 mt-0.5 px-2 text-left">
+                      Payout ${(stake * 2.38).toFixed(2)}
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => executeTrade('UNDER')}
+                    disabled={isTrading}
+                    className="py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold text-sm transition disabled:opacity-50"
+                  >
+                    <div className="flex items-center justify-between px-2">
+                      <span className="font-bold">UNDER {selectedDigit}</span>
+                      <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+90%</span>
+                    </div>
+                    <div className="text-[10px] font-normal opacity-90 mt-0.5 px-2 text-left">
+                      Payout ${(stake * 1.9).toFixed(2)}
+                    </div>
+                  </button>
+                </div>
+              )}
+
+              {digitMode === 'even-odd' && (
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => executeTrade('DIGIT')}
+                    disabled={isTrading}
+                    className="py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold text-sm transition disabled:opacity-50"
+                  >
+                    <div className="flex items-center justify-between px-2">
+                      <span className="font-bold">EVEN</span>
+                      <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+95%</span>
+                    </div>
+                    <div className="text-[10px] font-normal opacity-90 mt-0.5 px-2 text-left">
+                      Payout ${(stake * 1.95).toFixed(2)}
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => executeTrade('DIGIT')}
+                    disabled={isTrading}
+                    className="py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold text-sm transition disabled:opacity-50"
+                  >
+                    <div className="flex items-center justify-between px-2">
+                      <span className="font-bold">ODD</span>
+                      <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+95%</span>
+                    </div>
+                    <div className="text-[10px] font-normal opacity-90 mt-0.5 px-2 text-left">
+                      Payout ${(stake * 1.95).toFixed(2)}
+                    </div>
+                  </button>
+                </div>
+              )}
+
+              {digitMode === 'matches-differs' && (
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => executeTrade('DIGIT')}
+                    disabled={isTrading}
+                    className="py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold text-sm transition disabled:opacity-50"
+                  >
+                    <div className="flex items-center justify-between px-2">
+                      <span className="font-bold">MATCHES {selectedDigit}</span>
+                      <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+800%</span>
+                    </div>
+                    <div className="text-[10px] font-normal opacity-90 mt-0.5 px-2 text-left">
+                      Payout ${(stake * 9).toFixed(2)}
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => executeTrade('DIGIT')}
+                    disabled={isTrading}
+                    className="py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold text-sm transition disabled:opacity-50"
+                  >
+                    <div className="flex items-center justify-between px-2">
+                      <span className="font-bold">DIFFERS</span>
+                      <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+9%</span>
+                    </div>
+                    <div className="text-[10px] font-normal opacity-90 mt-0.5 px-2 text-left">
+                      Payout ${(stake * 1.09).toFixed(2)}
+                    </div>
+                  </button>
+                </div>
+              )}
             </>
           )}
 
