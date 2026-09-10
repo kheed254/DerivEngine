@@ -60,7 +60,7 @@ export default function HomePage() {
     return () => subscription.unsubscribe()
   }, [])
 
-  // Connect to Deriv for live prices
+  // Connect to Deriv for live prices + always-on simulation
   useEffect(() => {
     let derivClient: DerivClient
     let isMounted = true
@@ -75,19 +75,22 @@ export default function HomePage() {
           const digit = Math.floor(newPrice * 100) % 10
           setLastDigit(digit)
         })
-        await derivClient.subscribeToTicks('R_100')
+        await derivClient.subscribeToTicks('1HZ100V')
         setIsDerivConnected(true)
       } catch (error) {
         setIsDerivConnected(false)
-        fallbackInterval = setInterval(() => {
-          setPrice((prev) => {
-            const next = Math.max(100, prev + (Math.random() - 0.5) * 2)
-            const digit = Math.floor(next * 100) % 10
-            setLastDigit(digit)
-            return next
-          })
-        }, 1000)
       }
+
+      // Always run a price simulation as a heartbeat
+      fallbackInterval = setInterval(() => {
+        if (!isMounted) return
+        setPrice((prev) => {
+          const next = Math.max(100, prev + (Math.random() - 0.5) * 2)
+          const digit = Math.floor(next * 100) % 10
+          setLastDigit(digit)
+          return next
+        })
+      }, 1000)
     }
 
     connectDeriv()
@@ -119,7 +122,6 @@ export default function HomePage() {
         const LineStyle = lib.LineStyle
         const LineSeries = lib.LineSeries
 
-        // Clean up previous chart
         if (chartInstance.current) {
           chartInstance.current.remove()
           chartInstance.current = null
@@ -150,7 +152,6 @@ export default function HomePage() {
           },
         })
 
-        // v5 API: use addSeries with LineSeries
         let lineSeries: any
         if (typeof chart.addSeries === 'function' && LineSeries) {
           lineSeries = chart.addSeries(LineSeries, {
@@ -160,7 +161,6 @@ export default function HomePage() {
             lastValueVisible: true,
           })
         } else if (typeof chart.addLineSeries === 'function') {
-          // Fallback for v4
           lineSeries = chart.addLineSeries({
             color: '#a855f7',
             lineWidth: 2,
@@ -217,23 +217,30 @@ export default function HomePage() {
     }
   }, [showDashboard, isLoggedIn])
 
-  // Update chart with live price
+  // Update chart with live price — runs on a 1s ticker so it always moves
   useEffect(() => {
-    if (!seriesRef.current || !showDashboard) return
+    if (!showDashboard) return
 
-    const now = Math.floor(Date.now() / 1000)
-    const lastPoint = priceHistoryRef.current[priceHistoryRef.current.length - 1]
+    const tick = () => {
+      if (!seriesRef.current) return
+      const now = Math.floor(Date.now() / 1000)
+      const lastPoint = priceHistoryRef.current[priceHistoryRef.current.length - 1]
 
-    if (!lastPoint || now > lastPoint.time) {
-      const newPoint = { time: now, value: Math.round(price * 100) / 100 }
-      priceHistoryRef.current = [...priceHistoryRef.current.slice(-200), newPoint]
-      try {
-        seriesRef.current.update(newPoint as any)
-      } catch (e) {
-        // ignore
+      if (!lastPoint || now > lastPoint.time) {
+        const newPoint = { time: now, value: Math.round(price * 100) / 100 }
+        priceHistoryRef.current = [...priceHistoryRef.current.slice(-200), newPoint]
+        try {
+          seriesRef.current.update(newPoint as any)
+        } catch (e) {
+          // ignore
+        }
       }
     }
-  }, [price, showDashboard, isLoggedIn])
+
+    const interval = setInterval(tick, 1000)
+    tick()
+    return () => clearInterval(interval)
+  }, [showDashboard, price])
 
   // Execute a trade
   const executeTrade = async (prediction: 'RISE' | 'FALL' | 'DIGIT') => {
