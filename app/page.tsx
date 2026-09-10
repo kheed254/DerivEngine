@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { DerivClient } from '@/lib/derivClient'
-import { ChevronDown, LogOut, Clock, Zap, Play, X } from 'lucide-react'
+import { ChevronDown, LogOut, Clock, Zap, Play, X, Search, Sparkles } from 'lucide-react'
 
 export default function HomePage() {
   const [price, setPrice] = useState(730.69)
@@ -44,9 +44,12 @@ export default function HomePage() {
   const [isBotRunning, setIsBotRunning] = useState(false)
 
   // AI Scanner
-  const [aiTradeType, setAiTradeType] = useState('Match / Differ')
+  const [aiTradeType, setAiTradeType] = useState('Even / Odd')
   const [aiScanProgress, setAiScanProgress] = useState(0)
   const [aiScanning, setAiScanning] = useState(false)
+  const [aiScannedMarkets, setAiScannedMarkets] = useState<string[]>([])
+  const [aiBestMarket, setAiBestMarket] = useState<string>('Volatility 100 (1s) Index')
+  const [aiPrediction, setAiPrediction] = useState('Even')
 
   const chartRef = useRef<HTMLDivElement>(null)
   const chartInstance = useRef<any>(null)
@@ -54,6 +57,8 @@ export default function HomePage() {
   const priceHistoryRef = useRef<{ time: number; value: number }[]>([])
 
   const isDark = theme === 'dark'
+
+  const aiMarkets = ['V10', 'V25', 'V50', 'V75', 'V100', 'V10 1s', 'V25 1s', 'V50 1s', 'V75 1s', 'V100 1s']
 
   const getOverMultiplier = (d: number) => ({ 0: 1.11, 1: 1.25, 2: 1.43, 3: 1.67, 4: 2.00, 5: 2.50, 6: 3.33, 7: 5.00, 8: 10.00 }[d] ?? 2.00)
   const getUnderMultiplier = (d: number) => ({ 1: 10.00, 2: 5.00, 3: 3.33, 4: 2.50, 5: 2.00, 6: 1.67, 7: 1.43, 8: 1.25, 9: 1.11 }[d] ?? 2.00)
@@ -236,18 +241,47 @@ export default function HomePage() {
 
   const handleLogout = async () => { await supabase.auth.signOut(); setShowDashboard(false) }
   const resetDemo = () => { setBalance(10000); setTradeResult('Demo account reset to $10,000') }
-  const toggleTheme = () => setTheme(isDark ? 'light' : 'dark')
+  const toggleTheme = () => setTheme(isDark ? 'dark' : 'dark') // placeholder
   const potentialPayout = stake * 1.9
 
   const runDeepScan = async () => {
     setAiScanning(true)
     setAiScanProgress(0)
-    for (let i = 1; i <= 10; i++) {
-      await new Promise((r) => setTimeout(r, 400))
-      setAiScanProgress(i)
+    setAiScannedMarkets([])
+
+    for (let i = 0; i < aiMarkets.length; i++) {
+      await new Promise((r) => setTimeout(r, 500))
+      setAiScannedMarkets((prev) => [...prev, aiMarkets[i]])
+      setAiScanProgress(i + 1)
     }
+
+    // Pick a "best market" at random
+    const best = aiMarkets[Math.floor(Math.random() * aiMarkets.length)]
+    setAiBestMarket(best)
+    setAiPrediction(Math.random() > 0.5 ? 'Even' : 'Odd')
     setAiScanning(false)
-    setTradeResult('✅ Scan complete! Best market found: Volatility 100 (1s) Index')
+  }
+
+  const loadScannerBot = () => {
+    setSelectedMarket(aiBestMarket === 'V100 1s' ? 'Volatility 100 (1s) Index' :
+                      aiBestMarket === 'V100' ? 'Volatility 100 Index' :
+                      aiBestMarket === 'V75 1s' ? 'Volatility 75 (1s) Index' :
+                      aiBestMarket === 'V75' ? 'Volatility 75 Index' :
+                      aiBestMarket === 'V50 1s' ? 'Volatility 50 (1s) Index' :
+                      aiBestMarket === 'V50' ? 'Volatility 50 Index' :
+                      aiBestMarket === 'V25 1s' ? 'Volatility 25 (1s) Index' :
+                      aiBestMarket === 'V25' ? 'Volatility 25 Index' :
+                      aiBestMarket === 'V10 1s' ? 'Volatility 10 (1s) Index' :
+                      aiBestMarket === 'V10' ? 'Volatility 10 Index' :
+                      'Volatility 100 (1s) Index')
+    setTradeMode('auto')
+    setTradeType('digits')
+    setDigitMode(aiTradeType === 'Match / Differ' ? 'matches-differs' :
+                 aiTradeType === 'Over / Under' ? 'over-under' :
+                 aiTradeType === 'Even / Odd' ? 'even-odd' : 'over-under')
+    setBotTrade(aiPrediction === 'Even' ? 'EVEN' :
+                aiPrediction === 'Odd' ? 'ODD' : 'OVER')
+    setTradeResult(`✅ Loaded ${aiBestMarket} Bot with ${aiTradeType}`)
   }
 
   const markets = [
@@ -270,9 +304,6 @@ export default function HomePage() {
             <span className="font-bold text-lg">DerivEngine</span>
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={toggleTheme} className={`w-9 h-9 rounded-full border flex items-center justify-center ${isDark ? 'bg-white/5 border-white/10' : 'bg-gray-100 border-gray-200'}`}>
-              <span className="text-sm">{isDark ? '☀️' : '🌙'}</span>
-            </button>
             <Link href="/login" className={`px-4 py-2 text-sm border rounded-lg ${isDark ? 'border-white/20' : 'border-gray-300'}`}>Sign in</Link>
             <Link href="/register" className="px-4 py-2 text-sm text-white bg-purple-600 hover:bg-purple-700 rounded-lg font-medium">Get started</Link>
           </div>
@@ -353,9 +384,6 @@ export default function HomePage() {
             </button>
             <button className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium flex items-center gap-2">
               <span>↓</span> Deposit
-            </button>
-            <button onClick={toggleTheme} className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'bg-white/5' : 'bg-gray-100'}`}>
-              <span className="text-sm">{isDark ? '☀️' : '🌙'}</span>
             </button>
             <button onClick={handleLogout} className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'bg-white/5' : 'bg-gray-100'}`}>
               <LogOut className="w-4 h-4 text-gray-400" />
@@ -459,7 +487,6 @@ export default function HomePage() {
 
         {/* Trading Panel */}
         <div className={`lg:col-span-3 rounded-2xl border p-4 ${isDark ? 'bg-[#0d0818] border-purple-500/20' : 'bg-white border-gray-200'}`}>
-          {/* Manual / Auto / AI */}
           <div className="flex gap-2 mb-3">
             <button onClick={() => setTradeMode('manual')}
               className={`flex-1 py-2 rounded-lg text-sm font-medium ${tradeMode === 'manual' ? 'bg-purple-600 text-white' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>
@@ -475,7 +502,6 @@ export default function HomePage() {
             </button>
           </div>
 
-          {/* Trade type tabs */}
           <div className="flex gap-2 mb-3">
             <button onClick={() => setTradeType('rise-fall')} className={`flex-1 py-2 rounded-lg text-xs font-medium ${tradeType === 'rise-fall' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Rise/Fall</button>
             <button onClick={() => setTradeType('digits')} className={`flex-1 py-2 rounded-lg text-xs font-medium ${tradeType === 'digits' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Digits</button>
@@ -484,7 +510,6 @@ export default function HomePage() {
             )}
           </div>
 
-          {/* Stake */}
           <div className="flex justify-between items-center mb-2">
             <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Stake (USD)</span>
             <div className="flex items-center gap-2">
@@ -847,34 +872,37 @@ export default function HomePage() {
       {/* AI Entry Scanner Modal */}
       {tradeMode === 'ai' && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <div className={`w-full max-w-md rounded-2xl border ${isDark ? 'bg-[#150d24] border-purple-500/20' : 'bg-white border-gray-200'}`}>
-            <div className={`flex items-start justify-between p-5 border-b ${isDark ? 'border-purple-500/20' : 'border-gray-200'}`}>
+          <div className={`w-full max-w-md rounded-2xl border ${isDark ? 'bg-white border-gray-200' : 'bg-white border-gray-200'}`}>
+            {/* Header */}
+            <div className="flex items-start justify-between p-5 border-b border-gray-200">
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
-                  <span className="text-purple-400 text-lg">✨</span>
+                <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">
+                  <Sparkles className="w-5 h-5 text-purple-600" />
                 </div>
                 <div>
-                  <h3 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>Entry Scanner</h3>
-                  <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                  <h3 className="font-bold text-lg text-gray-900">Entry Scanner</h3>
+                  <p className="text-xs text-gray-500">
                     Deep-scans 10 markets for the best entry
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setTradeMode('manual')}
-                className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-100 hover:bg-gray-200'}`}
+                className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 hover:bg-gray-200"
               >
-                <X className={`w-4 h-4 ${isDark ? 'text-gray-400' : 'text-gray-600'}`} />
+                <X className="w-4 h-4 text-gray-600" />
               </button>
             </div>
 
+            {/* Body */}
             <div className="p-5">
+              {/* Trade type */}
               <div className="mb-4">
-                <label className={`text-xs block mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Trade type</label>
+                <label className="text-xs block mb-2 text-gray-600">Trade type</label>
                 <select
                   value={aiTradeType}
                   onChange={(e) => setAiTradeType(e.target.value)}
-                  className={`w-full rounded-lg px-4 py-3 outline-none border text-sm font-medium ${isDark ? 'bg-[#0a0613] text-white border-purple-500/20' : 'bg-gray-50 text-gray-900 border-gray-200'}`}
+                  className="w-full rounded-lg px-4 py-3 outline-none border text-sm font-medium bg-gray-50 text-gray-900 border-gray-200"
                 >
                   <option>Match / Differ</option>
                   <option>Over / Under</option>
@@ -883,42 +911,147 @@ export default function HomePage() {
                 </select>
               </div>
 
-              <div className="mb-4">
-                <div className="flex justify-between items-center mb-2">
-                  <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Ready to scan</span>
-                  <span className={`text-xs font-medium ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                    {aiScanProgress}/10
-                  </span>
-                </div>
-                <div className={`h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-[#0a0613]' : 'bg-gray-100'}`}>
-                  <div
-                    className="h-full bg-purple-500 transition-all duration-300"
-                    style={{ width: `${(aiScanProgress / 10) * 100}%` }}
-                  />
-                </div>
-              </div>
+              {/* Scanning State */}
+              {aiScanning && (
+                <>
+                  <div className="mb-4 p-5 rounded-2xl bg-purple-50 border border-purple-100 text-center">
+                    <div className="w-14 h-14 mx-auto rounded-full bg-purple-500/20 flex items-center justify-center mb-3 animate-pulse">
+                      <Sparkles className="w-6 h-6 text-purple-600" />
+                    </div>
+                    <div className="text-gray-900 font-bold">Deep scanning</div>
+                    <div className="text-xs text-gray-500 mb-3">Volatility 75 (1s) Index</div>
+                    <div className="flex flex-wrap justify-center gap-1">
+                      {aiMarkets.map((m) => (
+                        <span key={m}
+                          className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                            aiScannedMarkets.includes(m)
+                              ? 'bg-emerald-500/20 text-emerald-600 line-through'
+                              : 'bg-purple-500/20 text-purple-600'
+                          }`}>
+                          ✓ {m}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
 
-              <button
-                onClick={runDeepScan}
-                disabled={aiScanning}
-                className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 mb-3"
-              >
-                <span>🔍</span>
-                {aiScanning ? `Scanning... ${aiScanProgress}/10` : 'Deep Scan for Best Market'}
-              </button>
+                  <div className="mb-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-xs text-gray-500">Analyzing...</span>
+                      <span className="text-xs font-medium text-gray-600">{aiScanProgress}/10</span>
+                    </div>
+                    <div className="h-1.5 rounded-full overflow-hidden bg-gray-100">
+                      <div
+                        className="h-full bg-purple-500 transition-all duration-300"
+                        style={{ width: `${(aiScanProgress / 10) * 100}%` }}
+                      />
+                    </div>
+                  </div>
 
-              <button
-                disabled={aiScanProgress < 10}
-                className={`w-full py-3.5 rounded-xl font-bold text-sm transition ${
-                  aiScanProgress >= 10
-                    ? 'bg-purple-500/20 text-purple-400 hover:bg-purple-500/30'
-                    : isDark
-                    ? 'bg-white/5 text-gray-500 cursor-not-allowed'
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                }`}
-              >
-                Load Scanner Bot
-              </button>
+                  <button
+                    disabled
+                    className="w-full py-3.5 bg-purple-400/60 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 mb-3 cursor-not-allowed"
+                  >
+                    <Search className="w-4 h-4" />
+                    Scanning...
+                  </button>
+
+                  <button
+                    disabled
+                    className="w-full py-3.5 rounded-xl font-bold text-sm bg-gray-100 text-gray-400 cursor-not-allowed"
+                  >
+                    Load Scanner Bot
+                  </button>
+                </>
+              )}
+
+              {/* Done State */}
+              {!aiScanning && aiScanProgress === 10 && (
+                <>
+                  <div className="mb-4">
+                    <label className="text-xs block mb-2 text-gray-600">Selected market</label>
+                    <div className="w-full rounded-lg px-4 py-3 border text-sm font-medium bg-gray-50 text-gray-900 border-gray-200">
+                      {aiBestMarket === 'V100 1s' ? 'Volatility 100 (1s) Index' :
+                       aiBestMarket === 'V100' ? 'Volatility 100 Index' :
+                       aiBestMarket === 'V75 1s' ? 'Volatility 75 (1s) Index' :
+                       aiBestMarket === 'V75' ? 'Volatility 75 Index' :
+                       aiBestMarket === 'V50 1s' ? 'Volatility 50 (1s) Index' :
+                       aiBestMarket === 'V50' ? 'Volatility 50 Index' :
+                       aiBestMarket === 'V25 1s' ? 'Volatility 25 (1s) Index' :
+                       aiBestMarket === 'V25' ? 'Volatility 25 Index' :
+                       aiBestMarket === 'V10 1s' ? 'Volatility 10 (1s) Index' :
+                       aiBestMarket === 'V10' ? 'Volatility 10 Index' :
+                       'Volatility 100 (1s) Index'}
+                    </div>
+                  </div>
+
+                  <div className="mb-4">
+                    <label className="text-xs block mb-2 text-gray-600">Trade type</label>
+                    <div className="w-full rounded-lg px-4 py-3 border text-sm font-medium bg-gray-50 text-gray-900 border-gray-200">
+                      {aiTradeType}
+                    </div>
+                  </div>
+
+                  <div className="mb-4">
+                    <label className="text-xs block mb-2 text-gray-600">Prediction (auto)</label>
+                    <div className="w-full rounded-lg px-4 py-3 border text-sm font-medium bg-gray-50 text-gray-900 border-gray-200">
+                      {aiPrediction}
+                    </div>
+                  </div>
+
+                  <div className="mb-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-xs text-gray-500">Scan complete</span>
+                      <span className="text-xs font-medium text-gray-600">{aiScanProgress}/10</span>
+                    </div>
+                    <div className="h-1.5 rounded-full overflow-hidden bg-gray-100">
+                      <div className="h-full bg-purple-500 w-full" />
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={runDeepScan}
+                    className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 mb-3"
+                  >
+                    <Search className="w-4 h-4" />
+                    Re-scan for Best Market
+                  </button>
+
+                  <button
+                    onClick={loadScannerBot}
+                    className="w-full py-3.5 rounded-xl font-bold text-sm bg-white text-purple-600 border border-purple-300 hover:bg-purple-50 transition"
+                  >
+                    Load {aiBestMarket} Bot
+                  </button>
+                </>
+              )}
+
+              {/* Initial State */}
+              {!aiScanning && aiScanProgress === 0 && (
+                <>
+                  <div className="mb-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-xs text-gray-500">Ready to scan</span>
+                      <span className="text-xs font-medium text-gray-600">0/10</span>
+                    </div>
+                    <div className="h-1.5 rounded-full overflow-hidden bg-gray-100" />
+                  </div>
+
+                  <button
+                    onClick={runDeepScan}
+                    className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 mb-3"
+                  >
+                    <Search className="w-4 h-4" />
+                    Deep Scan for Best Market
+                  </button>
+
+                  <button
+                    disabled
+                    className="w-full py-3.5 rounded-xl font-bold text-sm bg-gray-100 text-gray-400 cursor-not-allowed"
+                  >
+                    Load Scanner Bot
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
