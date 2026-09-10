@@ -106,63 +106,95 @@ export default function HomePage() {
     let timeout: NodeJS.Timeout
 
     const initChart = async () => {
-      const { createChart } = await import('lightweight-charts')
+      try {
+        const container = chartRef.current
+        console.log('🔍 Chart container:', container ? 'FOUND' : 'MISSING', container?.clientWidth, 'x', container?.clientHeight)
+        if (!container) {
+          timeout = setTimeout(initChart, 500)
+          return
+        }
 
-      const container = chartRef.current
-      if (!container) return
+        const lib: any = await import('lightweight-charts')
+        const createChart = lib.createChart
+        const LineStyle = lib.LineStyle
+        const LineSeries = lib.LineSeries
 
-      if (chartInstance.current) {
-        chartInstance.current.remove()
-      }
+        // Clean up previous chart
+        if (chartInstance.current) {
+          chartInstance.current.remove()
+          chartInstance.current = null
+        }
 
-      chartInstance.current = createChart(container, {
-        width: container.clientWidth,
-        height: 400,
-        layout: {
-          background: { color: 'transparent' },
-          textColor: '#9ca3af',
-        },
-        grid: {
-          vertLines: { color: 'rgba(255, 255, 255, 0.03)' },
-          horzLines: { color: 'rgba(255, 255, 255, 0.03)' },
-        },
-        rightPriceScale: {
-          borderColor: 'rgba(255, 255, 255, 0.05)',
-        },
-        timeScale: {
-          borderColor: 'rgba(255, 255, 255, 0.05)',
-          timeVisible: true,
-        },
-        crosshair: {
-          mode: 1,
-        },
-      })
-
-      seriesRef.current = chartInstance.current.addAreaSeries({
-        lineColor: '#a855f7',
-        topColor: 'rgba(168, 85, 247, 0.4)',
-        bottomColor: 'rgba(168, 85, 247, 0.01)',
-        lineWidth: 2,
-        priceLineVisible: false,
-        lastValueVisible: true,
-      })
-
-      // Mock historical data
-      const now = Math.floor(Date.now() / 1000)
-      const initialData: { time: number; value: number }[] = []
-      let basePrice = 730
-      for (let i = 100; i >= 0; i--) {
-        basePrice = basePrice + (Math.random() - 0.5) * 3
-        initialData.push({
-          time: now - i * 2,
-          value: basePrice,
+        const chart = createChart(container, {
+          width: container.clientWidth,
+          height: 400,
+          layout: {
+            background: { color: 'transparent' },
+            textColor: '#9ca3af',
+          },
+          grid: {
+            vertLines: { color: 'rgba(255, 255, 255, 0.05)', style: LineStyle?.Dotted ?? 2 },
+            horzLines: { color: 'rgba(255, 255, 255, 0.05)', style: LineStyle?.Dotted ?? 2 },
+          },
+          rightPriceScale: {
+            borderColor: 'rgba(255, 255, 255, 0.1)',
+            scaleMargins: { top: 0.1, bottom: 0.1 },
+          },
+          timeScale: {
+            borderColor: 'rgba(255, 255, 255, 0.1)',
+            timeVisible: true,
+            secondsVisible: true,
+          },
+          crosshair: {
+            mode: 1,
+          },
         })
+
+        // v5 API: use addSeries with LineSeries
+        let lineSeries: any
+        if (typeof chart.addSeries === 'function' && LineSeries) {
+          lineSeries = chart.addSeries(LineSeries, {
+            color: '#a855f7',
+            lineWidth: 2,
+            priceLineVisible: false,
+            lastValueVisible: true,
+          })
+        } else if (typeof chart.addLineSeries === 'function') {
+          // Fallback for v4
+          lineSeries = chart.addLineSeries({
+            color: '#a855f7',
+            lineWidth: 2,
+            priceLineVisible: false,
+            lastValueVisible: true,
+          })
+        } else {
+          throw new Error('No compatible chart series method found')
+        }
+
+        // Generate historical data
+        const now = Math.floor(Date.now() / 1000)
+        const initialData: { time: number; value: number }[] = []
+        let basePrice = 730
+        for (let i = 200; i >= 0; i--) {
+          basePrice = basePrice + (Math.random() - 0.5) * 2
+          initialData.push({
+            time: now - i * 3,
+            value: Math.round(basePrice * 100) / 100,
+          })
+        }
+
+        lineSeries.setData(initialData as any)
+        seriesRef.current = lineSeries
+        chartInstance.current = chart
+        priceHistoryRef.current = initialData
+
+        console.log('✅ Chart initialized with', initialData.length, 'points')
+      } catch (err) {
+        console.error('❌ Chart init error:', err)
       }
-      priceHistoryRef.current = initialData
-      seriesRef.current.setData(initialData)
     }
 
-    timeout = setTimeout(initChart, 150)
+    timeout = setTimeout(initChart, 300)
 
     const handleResize = () => {
       const container = chartRef.current
@@ -180,27 +212,28 @@ export default function HomePage() {
       if (chartInstance.current) {
         chartInstance.current.remove()
         chartInstance.current = null
+        seriesRef.current = null
       }
     }
-  }, [showDashboard])
+  }, [showDashboard, isLoggedIn])
 
-  // Update chart on price changes
+  // Update chart with live price
   useEffect(() => {
     if (!seriesRef.current || !showDashboard) return
 
     const now = Math.floor(Date.now() / 1000)
-    const newPoint = { time: now, value: price }
-
     const lastPoint = priceHistoryRef.current[priceHistoryRef.current.length - 1]
-    if (!lastPoint || newPoint.time > lastPoint.time) {
-      priceHistoryRef.current = [...priceHistoryRef.current.slice(-150), newPoint]
+
+    if (!lastPoint || now > lastPoint.time) {
+      const newPoint = { time: now, value: Math.round(price * 100) / 100 }
+      priceHistoryRef.current = [...priceHistoryRef.current.slice(-200), newPoint]
       try {
-        seriesRef.current.update(newPoint)
+        seriesRef.current.update(newPoint as any)
       } catch (e) {
         // ignore
       }
     }
-  }, [price, showDashboard])
+  }, [price, showDashboard, isLoggedIn])
 
   // Execute a trade
   const executeTrade = async (prediction: 'RISE' | 'FALL' | 'DIGIT') => {
@@ -491,10 +524,13 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Chart - with explicit height */}
-          <div ref={chartRef} className="w-full rounded-lg overflow-hidden" style={{ height: '400px' }} />
+          {/* Chart container */}
+          <div
+            ref={chartRef}
+            className="w-full rounded-lg overflow-hidden"
+            style={{ height: '400px', minHeight: '400px' }}
+          />
 
-          {/* Live Last Digits */}
           <div className="mt-4">
             <div className="flex justify-between items-center mb-3">
               <div className={`text-xs font-medium ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
