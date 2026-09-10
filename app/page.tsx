@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { DerivClient } from '@/lib/derivClient'
-import { Loader2, ChevronDown, LogOut, Clock, Zap } from 'lucide-react'
+import { ChevronDown, LogOut, Clock, Zap, Play } from 'lucide-react'
 
 export default function HomePage() {
   const [price, setPrice] = useState(730.69)
@@ -14,7 +14,7 @@ export default function HomePage() {
   const [isDerivConnected, setIsDerivConnected] = useState(false)
   const [balance, setBalance] = useState(10000)
   const [isLiveMode, setIsLiveMode] = useState(false)
-  const [stake, setStake] = useState(10)
+  const [stake, setStake] = useState(0)
   const [duration, setDuration] = useState(60)
   const [multiplier, setMultiplier] = useState(100)
   const [selectedMarket, setSelectedMarket] = useState('Volatility 100 (1s) Index')
@@ -26,11 +26,22 @@ export default function HomePage() {
   const [activeTab, setActiveTab] = useState<'open' | 'closed'>('open')
   const [tradeType, setTradeType] = useState<'rise-fall' | 'digits' | 'multipliers'>('rise-fall')
   const [digitMode, setDigitMode] = useState<'over-under' | 'even-odd' | 'matches-differs'>('over-under')
-  const [selectedDigit, setSelectedDigit] = useState<number>(5)
-  const [digitSide, setDigitSide] = useState<'EVEN' | 'ODD' | 'OVER' | 'UNDER' | 'MATCHES' | 'DIFFERS'>('OVER')
+  const [selectedDigit, setSelectedDigit] = useState<number>(8)
+  const [digitSide, setDigitSide] = useState<string>('OVER')
   const [showDashboard, setShowDashboard] = useState(false)
   const [digitHistory] = useState<number[]>([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
   const [digitPercentages] = useState<number[]>([4, 12, 10, 12, 20, 8, 8, 18, 0, 14])
+
+  // Manual / Auto / AI
+  const [tradeMode, setTradeMode] = useState<'manual' | 'auto' | 'ai'>('manual')
+
+  // Auto bot settings
+  const [botTrade, setBotTrade] = useState<string>('RISE')
+  const [martingale, setMartingale] = useState(2)
+  const [maxRuns, setMaxRuns] = useState(50)
+  const [targetProfit, setTargetProfit] = useState(50)
+  const [stopLoss, setStopLoss] = useState(30)
+  const [isBotRunning, setIsBotRunning] = useState(false)
 
   const chartRef = useRef<HTMLDivElement>(null)
   const chartInstance = useRef<any>(null)
@@ -39,36 +50,10 @@ export default function HomePage() {
 
   const isDark = theme === 'dark'
 
-  // ─── Payout calculation based on barrier digit ───
-  const getOverMultiplier = (digit: number) => {
-    const map: { [key: number]: number } = {
-      0: 1.11, 1: 1.25, 2: 1.43, 3: 1.67,
-      4: 2.00, 5: 2.50, 6: 3.33, 7: 5.00, 8: 10.00,
-    }
-    return map[digit] ?? 2.00
-  }
-  const getUnderMultiplier = (digit: number) => {
-    const map: { [key: number]: number } = {
-      1: 10.00, 2: 5.00, 3: 3.33, 4: 2.50,
-      5: 2.00, 6: 1.67, 7: 1.43, 8: 1.25, 9: 1.11,
-    }
-    return map[digit] ?? 2.00
-  }
-  const getOverPercent = (digit: number) => {
-    const map: { [key: number]: number } = {
-      0: 11, 1: 25, 2: 43, 3: 67, 4: 100,
-      5: 150, 6: 233, 7: 400, 8: 900,
-    }
-    return map[digit] ?? 100
-  }
-  const getUnderPercent = (digit: number) => {
-    const map: { [key: number]: number } = {
-      1: 900, 2: 400, 3: 233, 4: 150,
-      5: 100, 6: 67, 7: 43, 8: 25, 9: 11,
-    }
-    return map[digit] ?? 100
-  }
-
+  const getOverMultiplier = (d: number) => ({ 0: 1.11, 1: 1.25, 2: 1.43, 3: 1.67, 4: 2.00, 5: 2.50, 6: 3.33, 7: 5.00, 8: 10.00 }[d] ?? 2.00)
+  const getUnderMultiplier = (d: number) => ({ 1: 10.00, 2: 5.00, 3: 3.33, 4: 2.50, 5: 2.00, 6: 1.67, 7: 1.43, 8: 1.25, 9: 1.11 }[d] ?? 2.00)
+  const getOverPercent = (d: number) => ({ 0: 11, 1: 25, 2: 43, 3: 67, 4: 100, 5: 150, 6: 233, 7: 400, 8: 900 }[d] ?? 100)
+  const getUnderPercent = (d: number) => ({ 1: 900, 2: 400, 3: 233, 4: 150, 5: 100, 6: 67, 7: 43, 8: 25, 9: 11 }[d] ?? 100)
   const overMultiplier = getOverMultiplier(selectedDigit)
   const underMultiplier = getUnderMultiplier(selectedDigit)
   const overPercent = getOverPercent(selectedDigit)
@@ -77,54 +62,35 @@ export default function HomePage() {
   // Auth
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setIsLoggedIn(true)
-        setUser(session.user)
-        setShowDashboard(true)
-      }
+      if (session) { setIsLoggedIn(true); setUser(session.user); setShowDashboard(true) }
     })
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        setIsLoggedIn(true)
-        setUser(session.user)
-        setShowDashboard(true)
-      } else {
-        setIsLoggedIn(false)
-        setUser(null)
-        setShowDashboard(false)
-      }
+      if (session) { setIsLoggedIn(true); setUser(session.user); setShowDashboard(true) }
+      else { setIsLoggedIn(false); setUser(null); setShowDashboard(false) }
     })
-
     return () => subscription.unsubscribe()
   }, [])
 
-  // Reset price when market changes
+  // Reset price on market change
   useEffect(() => {
     if (!showDashboard) return
     const basePrices: { [key: string]: number } = {
-      'Volatility 100 (1s) Index': 730,
-      'Volatility 100 Index': 1500,
-      'Volatility 75 (1s) Index': 98000,
-      'Volatility 75 Index': 98000,
-      'Volatility 50 (1s) Index': 240,
-      'Volatility 50 Index': 240,
-      'Volatility 25 (1s) Index': 2800,
-      'Volatility 25 Index': 2800,
-      'Volatility 10 (1s) Index': 6500,
-      'Volatility 10 Index': 6500,
+      'Volatility 100 (1s) Index': 730, 'Volatility 100 Index': 1500,
+      'Volatility 75 (1s) Index': 98000, 'Volatility 75 Index': 98000,
+      'Volatility 50 (1s) Index': 240, 'Volatility 50 Index': 240,
+      'Volatility 25 (1s) Index': 2800, 'Volatility 25 Index': 2800,
+      'Volatility 10 (1s) Index': 6500, 'Volatility 10 Index': 6500,
     }
     const base = basePrices[selectedMarket] || 730
     setPrice(base)
     setLastDigit(Math.floor(base * 100) % 10)
   }, [selectedMarket, showDashboard])
 
-  // Deriv connection + simulation
+  // Deriv + simulation
   useEffect(() => {
     let derivClient: DerivClient
     let isMounted = true
     let fallbackInterval: NodeJS.Timeout
-
     const connectDeriv = async () => {
       try {
         derivClient = new DerivClient()
@@ -135,10 +101,7 @@ export default function HomePage() {
         })
         await derivClient.subscribeToTicks('1HZ100V')
         setIsDerivConnected(true)
-      } catch (error) {
-        setIsDerivConnected(false)
-      }
-
+      } catch (error) { setIsDerivConnected(false) }
       fallbackInterval = setInterval(() => {
         if (!isMounted) return
         setPrice((prev) => {
@@ -148,9 +111,7 @@ export default function HomePage() {
         })
       }, 1000)
     }
-
     connectDeriv()
-
     return () => {
       isMounted = false
       if (fallbackInterval) clearInterval(fallbackInterval)
@@ -161,64 +122,39 @@ export default function HomePage() {
   // Chart setup
   useEffect(() => {
     if (!showDashboard) return
-
     let timeout: NodeJS.Timeout
-
     const initChart = async () => {
       try {
         const container = chartRef.current
-        if (!container) {
-          timeout = setTimeout(initChart, 500)
-          return
-        }
-
+        if (!container) { timeout = setTimeout(initChart, 500); return }
         const lib: any = await import('lightweight-charts')
         const createChart = lib.createChart
         const LineStyle = lib.LineStyle
         const LineSeries = lib.LineSeries
-
-        if (chartInstance.current) {
-          chartInstance.current.remove()
-          chartInstance.current = null
-        }
-
+        if (chartInstance.current) { chartInstance.current.remove(); chartInstance.current = null }
         const chart = createChart(container, {
-          width: container.clientWidth,
-          height: 400,
+          width: container.clientWidth, height: 400,
           layout: { background: { color: 'transparent' }, textColor: '#9ca3af' },
-          grid: {
-            vertLines: { color: 'rgba(255, 255, 255, 0.05)', style: LineStyle?.Dotted ?? 2 },
-            horzLines: { color: 'rgba(255, 255, 255, 0.05)', style: LineStyle?.Dotted ?? 2 },
-          },
+          grid: { vertLines: { color: 'rgba(255, 255, 255, 0.05)', style: LineStyle?.Dotted ?? 2 }, horzLines: { color: 'rgba(255, 255, 255, 0.05)', style: LineStyle?.Dotted ?? 2 } },
           rightPriceScale: { borderColor: 'rgba(255, 255, 255, 0.1)', scaleMargins: { top: 0.1, bottom: 0.1 } },
           timeScale: { borderColor: 'rgba(255, 255, 255, 0.1)', timeVisible: true, secondsVisible: true },
           crosshair: { mode: 1 },
         })
-
         let lineSeries: any
         if (typeof chart.addSeries === 'function' && LineSeries) {
           lineSeries = chart.addSeries(LineSeries, { color: '#a855f7', lineWidth: 2, priceLineVisible: false, lastValueVisible: true })
         } else if (typeof chart.addLineSeries === 'function') {
           lineSeries = chart.addLineSeries({ color: '#a855f7', lineWidth: 2, priceLineVisible: false, lastValueVisible: true })
-        } else {
-          throw new Error('No compatible chart series method found')
         }
-
         const basePrices: { [key: string]: number } = {
-          'Volatility 100 (1s) Index': 730,
-          'Volatility 100 Index': 1500,
-          'Volatility 75 (1s) Index': 98000,
-          'Volatility 75 Index': 98000,
-          'Volatility 50 (1s) Index': 240,
-          'Volatility 50 Index': 240,
-          'Volatility 25 (1s) Index': 2800,
-          'Volatility 25 Index': 2800,
-          'Volatility 10 (1s) Index': 6500,
-          'Volatility 10 Index': 6500,
+          'Volatility 100 (1s) Index': 730, 'Volatility 100 Index': 1500,
+          'Volatility 75 (1s) Index': 98000, 'Volatility 75 Index': 98000,
+          'Volatility 50 (1s) Index': 240, 'Volatility 50 Index': 240,
+          'Volatility 25 (1s) Index': 2800, 'Volatility 25 Index': 2800,
+          'Volatility 10 (1s) Index': 6500, 'Volatility 10 Index': 6500,
         }
         const startPrice = basePrices[selectedMarket] || 730
         const volatility = Math.max(1, startPrice * 0.005)
-
         const now = Math.floor(Date.now() / 1000)
         const initialData: { time: number; value: number }[] = []
         let basePrice = startPrice
@@ -226,36 +162,22 @@ export default function HomePage() {
           basePrice = basePrice + (Math.random() - 0.5) * volatility
           initialData.push({ time: now - i * 3, value: Math.round(basePrice * 100) / 100 })
         }
-
         lineSeries.setData(initialData as any)
         seriesRef.current = lineSeries
         chartInstance.current = chart
         priceHistoryRef.current = initialData
-
-        console.log('✅ Chart initialized for', selectedMarket)
-      } catch (err) {
-        console.error('❌ Chart init error:', err)
-      }
+      } catch (err) { console.error('❌ Chart init error:', err) }
     }
-
     timeout = setTimeout(initChart, 300)
-
     const handleResize = () => {
       const container = chartRef.current
-      if (container && chartInstance.current) {
-        chartInstance.current.applyOptions({ width: container.clientWidth })
-      }
+      if (container && chartInstance.current) { chartInstance.current.applyOptions({ width: container.clientWidth }) }
     }
     window.addEventListener('resize', handleResize)
-
     return () => {
       clearTimeout(timeout)
       window.removeEventListener('resize', handleResize)
-      if (chartInstance.current) {
-        chartInstance.current.remove()
-        chartInstance.current = null
-        seriesRef.current = null
-      }
+      if (chartInstance.current) { chartInstance.current.remove(); chartInstance.current = null; seriesRef.current = null }
     }
   }, [showDashboard, isLoggedIn, selectedMarket])
 
@@ -277,11 +199,9 @@ export default function HomePage() {
     return () => clearInterval(interval)
   }, [showDashboard, price, selectedMarket])
 
-  // Execute trade
   const executeTrade = async (prediction: string) => {
     setIsTrading(true)
     setTradeResult(null)
-
     try {
       const result = Math.random() > 0.5 ? 'WIN' : 'LOSS'
       let payoutRate = 1.9
@@ -291,71 +211,38 @@ export default function HomePage() {
       else if (prediction === 'DIFFERS') payoutRate = 1.09
       else if (prediction === 'EVEN' || prediction === 'ODD') payoutRate = 1.95
       else if (prediction === 'UP' || prediction === 'DOWN') payoutRate = 2.0
-
       const payout = result === 'WIN' ? stake * payoutRate : 0
-
       const contract = {
         id: Math.random().toString(36).substring(2, 10),
-        market: selectedMarket,
-        type: prediction,
-        stake,
-        entryPrice: price,
-        result,
+        market: selectedMarket, type: prediction, stake, entryPrice: price, result,
         payout: result === 'WIN' ? payout : -stake,
         time: new Date().toLocaleTimeString(),
       }
-
-      if (result === 'WIN') {
-        setBalance((prev) => prev + payout)
-        setTradeResult(`🎉 You won! +$${payout.toFixed(2)}`)
-      } else {
-        setBalance((prev) => prev - stake)
-        setTradeResult(`😢 You lost. -$${stake.toFixed(2)}`)
-      }
-
+      if (result === 'WIN') { setBalance((prev) => prev + payout); setTradeResult(`🎉 You won! +$${payout.toFixed(2)}`) }
+      else { setBalance((prev) => prev - stake); setTradeResult(`😢 You lost. -$${stake.toFixed(2)}`) }
       setOpenPositions((prev) => [contract, ...prev])
       setTimeout(() => {
         setOpenPositions((prev) => prev.filter((c) => c.id !== contract.id))
         setClosedPositions((prev) => [contract, ...prev])
       }, 5000)
-
       setIsTrading(false)
-    } catch (error: any) {
-      setTradeResult(`❌ Error: ${error.message}`)
-      setIsTrading(false)
-    }
+    } catch (error: any) { setTradeResult(`❌ Error: ${error.message}`); setIsTrading(false) }
   }
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    setShowDashboard(false)
-  }
-
-  const resetDemo = () => {
-    setBalance(10000)
-    setTradeResult('Demo account reset to $10,000')
-  }
-
+  const handleLogout = async () => { await supabase.auth.signOut(); setShowDashboard(false) }
+  const resetDemo = () => { setBalance(10000); setTradeResult('Demo account reset to $10,000') }
   const toggleTheme = () => setTheme(isDark ? 'light' : 'dark')
-
   const potentialPayout = stake * 1.9
 
   const markets = [
-    'Volatility 100 (1s) Index',
-    'Volatility 100 Index',
-    'Volatility 75 (1s) Index',
-    'Volatility 75 Index',
-    'Volatility 50 (1s) Index',
-    'Volatility 50 Index',
-    'Volatility 25 (1s) Index',
-    'Volatility 25 Index',
-    'Volatility 10 (1s) Index',
-    'Volatility 10 Index',
+    'Volatility 100 (1s) Index', 'Volatility 100 Index',
+    'Volatility 75 (1s) Index', 'Volatility 75 Index',
+    'Volatility 50 (1s) Index', 'Volatility 50 Index',
+    'Volatility 25 (1s) Index', 'Volatility 25 Index',
+    'Volatility 10 (1s) Index', 'Volatility 10 Index',
   ]
 
-  // ═══════════════════════════════════════════════
-  // LANDING PAGE
-  // ═══════════════════════════════════════════════
+  // Landing
   if (!showDashboard) {
     return (
       <main className={`min-h-screen ${isDark ? 'bg-[#0a0613] text-white' : 'bg-gray-50 text-gray-900'}`}>
@@ -411,9 +298,7 @@ export default function HomePage() {
     )
   }
 
-  // ═══════════════════════════════════════════════
-  // DASHBOARD
-  // ═══════════════════════════════════════════════
+  // Dashboard
   return (
     <main className={`min-h-screen ${isDark ? 'bg-[#0a0613] text-white' : 'bg-gray-50 text-gray-900'}`}>
       <nav className={`border-b ${isDark ? 'border-purple-500/20 bg-[#0d0818]' : 'border-gray-200 bg-white'}`}>
@@ -464,7 +349,7 @@ export default function HomePage() {
       </nav>
 
       <div className="px-4 py-4 grid grid-cols-1 lg:grid-cols-12 gap-4 max-w-[1600px] mx-auto">
-        {/* LEFT: Positions */}
+        {/* Positions */}
         <div className={`lg:col-span-2 rounded-2xl border p-4 ${isDark ? 'bg-[#0d0818] border-purple-500/20' : 'bg-white border-gray-200'}`}>
           <div className="flex gap-2 mb-4">
             <button onClick={() => setActiveTab('open')} className={`flex-1 py-2 rounded-lg text-xs font-medium ${activeTab === 'open' ? 'bg-purple-500/20 text-purple-400' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>
@@ -502,7 +387,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* MIDDLE: Chart */}
+        {/* Chart */}
         <div className={`lg:col-span-7 rounded-2xl border p-4 ${isDark ? 'bg-[#0d0818] border-purple-500/20' : 'bg-white border-gray-200'}`}>
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <div className="flex items-center gap-3">
@@ -526,14 +411,11 @@ export default function HomePage() {
               </div>
             </div>
           </div>
-
           <div className="flex gap-4 text-xs mb-3">
             <div className={isDark ? 'text-gray-400' : 'text-gray-600'}>High <span className="text-purple-400">{(price + 5).toFixed(2)}</span></div>
             <div className={isDark ? 'text-gray-400' : 'text-gray-600'}>Low <span className="text-purple-400">{(price - 5).toFixed(2)}</span></div>
           </div>
-
           <div ref={chartRef} className="w-full rounded-lg overflow-hidden" style={{ height: '400px', minHeight: '400px' }} />
-
           <div className="mt-4">
             <div className="flex justify-between items-center mb-3">
               <div className={`text-xs font-medium ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
@@ -559,20 +441,34 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* RIGHT: Trading Panel */}
+        {/* Trading Panel */}
         <div className={`lg:col-span-3 rounded-2xl border p-4 ${isDark ? 'bg-[#0d0818] border-purple-500/20' : 'bg-white border-gray-200'}`}>
+          {/* Manual / Auto / AI */}
           <div className="flex gap-2 mb-3">
-            <button className="flex-1 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium">Manual</button>
-            <button className={`flex-1 py-2 rounded-lg text-sm font-medium ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Auto</button>
-            <button className={`flex-1 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>✨ AI</button>
+            <button onClick={() => setTradeMode('manual')}
+              className={`flex-1 py-2 rounded-lg text-sm font-medium ${tradeMode === 'manual' ? 'bg-purple-600 text-white' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+              Manual
+            </button>
+            <button onClick={() => setTradeMode('auto')}
+              className={`flex-1 py-2 rounded-lg text-sm font-medium ${tradeMode === 'auto' ? 'bg-purple-600 text-white' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+              Auto
+            </button>
+            <button onClick={() => setTradeMode('ai')}
+              className={`flex-1 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-1 ${tradeMode === 'ai' ? 'bg-purple-600 text-white' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+              ✨ AI
+            </button>
           </div>
 
+          {/* Trade type tabs — no Multipliers in Auto */}
           <div className="flex gap-2 mb-3">
             <button onClick={() => setTradeType('rise-fall')} className={`flex-1 py-2 rounded-lg text-xs font-medium ${tradeType === 'rise-fall' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Rise/Fall</button>
             <button onClick={() => setTradeType('digits')} className={`flex-1 py-2 rounded-lg text-xs font-medium ${tradeType === 'digits' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Digits</button>
-            <button onClick={() => setTradeType('multipliers')} className={`flex-1 py-2 rounded-lg text-xs font-medium ${tradeType === 'multipliers' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Multipliers</button>
+            {tradeMode !== 'auto' && (
+              <button onClick={() => setTradeType('multipliers')} className={`flex-1 py-2 rounded-lg text-xs font-medium ${tradeType === 'multipliers' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Multipliers</button>
+            )}
           </div>
 
+          {/* Stake */}
           <div className="flex justify-between items-center mb-2">
             <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Stake (USD)</span>
             <div className="flex items-center gap-2">
@@ -585,8 +481,8 @@ export default function HomePage() {
           </div>
 
           <div className="flex items-center gap-2 mb-3">
-            <button onClick={() => setStake(Math.max(1, stake - 1))} className={`w-10 h-12 rounded-lg text-xl font-bold ${isDark ? 'bg-[#150d24] text-white' : 'bg-gray-100 text-gray-900'}`}>−</button>
-            <input type="number" value={stake} onChange={(e) => setStake(Math.max(1, Number(e.target.value)))} min={1}
+            <button onClick={() => setStake(Math.max(0, stake - 1))} className={`w-10 h-12 rounded-lg text-xl font-bold ${isDark ? 'bg-[#150d24] text-white' : 'bg-gray-100 text-gray-900'}`}>−</button>
+            <input type="number" value={stake} onChange={(e) => setStake(Math.max(0, Number(e.target.value)))} min={0}
               className={`flex-1 text-center text-xl font-bold rounded-lg py-3 outline-none border ${isDark ? 'bg-[#150d24] text-white border-purple-500/20' : 'bg-gray-50 text-gray-900 border-gray-200'}`} />
             <button onClick={() => setStake(stake + 1)} className={`w-10 h-12 rounded-lg text-xl font-bold ${isDark ? 'bg-[#150d24] text-white' : 'bg-gray-100 text-gray-900'}`}>+</button>
           </div>
@@ -600,189 +496,345 @@ export default function HomePage() {
             ))}
           </div>
 
-          {/* RISE/FALL */}
-          {tradeType === 'rise-fall' && (
+          {/* ═══════ AUTO MODE ═══════ */}
+          {tradeMode === 'auto' && (
             <>
-              <div className="mb-3">
-                <div className={`text-xs mb-2 flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                  <Clock className="w-3 h-3" /> Duration
-                </div>
-                <div className="grid grid-cols-5 gap-1.5">
-                  {[{ v: 15, l: '15s' }, { v: 30, l: '30s' }, { v: 60, l: '1m' }, { v: 120, l: '2m' }, { v: 300, l: '5m' }].map((d) => (
-                    <button key={d.v} onClick={() => setDuration(d.v)}
-                      className={`py-2 rounded-lg text-xs font-medium ${duration === d.v ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
-                      {d.l}
+              {/* RISE/FALL auto */}
+              {tradeType === 'rise-fall' && (
+                <>
+                  <div className="mb-3">
+                    <div className={`text-xs mb-2 flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                      <Clock className="w-3 h-3" /> Duration
+                    </div>
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {[{ v: 15, l: '15s' }, { v: 30, l: '30s' }, { v: 60, l: '1m' }, { v: 120, l: '2m' }, { v: 300, l: '5m' }].map((d) => (
+                        <button key={d.v} onClick={() => setDuration(d.v)}
+                          className={`py-2 rounded-lg text-xs font-medium ${duration === d.v ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                          {d.l}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mb-3">
+                    <div className={`text-xs mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Bot trades</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button onClick={() => setBotTrade('RISE')}
+                        className={`py-3 rounded-lg text-xs font-bold ${botTrade === 'RISE' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                        RISE
+                      </button>
+                      <button onClick={() => setBotTrade('FALL')}
+                        className={`py-3 rounded-lg text-xs font-bold ${botTrade === 'FALL' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                        FALL
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* DIGITS auto */}
+              {tradeType === 'digits' && (
+                <>
+                  <div className="grid grid-cols-3 gap-1.5 mb-3">
+                    <button onClick={() => setDigitMode('over-under')}
+                      className={`py-2 rounded-lg text-xs font-medium ${digitMode === 'over-under' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
+                      Over / Under
                     </button>
-                  ))}
+                    <button onClick={() => setDigitMode('even-odd')}
+                      className={`py-2 rounded-lg text-xs font-medium ${digitMode === 'even-odd' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
+                      Even / Odd
+                    </button>
+                    <button onClick={() => setDigitMode('matches-differs')}
+                      className={`py-2 rounded-lg text-xs font-medium ${digitMode === 'matches-differs' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
+                      Matches / Differs
+                    </button>
+                  </div>
+
+                  <div className={`flex items-center justify-between p-3 rounded-lg mb-3 ${isDark ? 'bg-[#150d24]' : 'bg-gray-50'}`}>
+                    <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                      {digitMode === 'matches-differs' ? 'Target digit' : 'Barrier digit'}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="w-8 h-8 rounded-lg bg-purple-600 text-white font-bold flex items-center justify-center">{selectedDigit}</span>
+                      <span className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>tap chart digits</span>
+                    </div>
+                  </div>
+
+                  {/* Bot trades */}
+                  <div className="mb-3">
+                    <div className={`text-xs mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Bot trades</div>
+                    {digitMode === 'over-under' && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <button onClick={() => setBotTrade('OVER')}
+                          className={`py-3 rounded-lg text-xs font-bold ${botTrade === 'OVER' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                          OVER {selectedDigit}
+                        </button>
+                        <button onClick={() => setBotTrade('UNDER')}
+                          className={`py-3 rounded-lg text-xs font-bold ${botTrade === 'UNDER' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                          UNDER {selectedDigit}
+                        </button>
+                      </div>
+                    )}
+                    {digitMode === 'even-odd' && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <button onClick={() => setBotTrade('EVEN')}
+                          className={`py-3 rounded-lg text-xs font-bold ${botTrade === 'EVEN' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                          EVEN
+                        </button>
+                        <button onClick={() => setBotTrade('ODD')}
+                          className={`py-3 rounded-lg text-xs font-bold ${botTrade === 'ODD' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                          ODD
+                        </button>
+                      </div>
+                    )}
+                    {digitMode === 'matches-differs' && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <button onClick={() => setBotTrade('MATCHES')}
+                          className={`py-3 rounded-lg text-xs font-bold ${botTrade === 'MATCHES' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                          MATCHES {selectedDigit}
+                        </button>
+                        <button onClick={() => setBotTrade('DIFFERS')}
+                          className={`py-3 rounded-lg text-xs font-bold ${botTrade === 'DIFFERS' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                          DIFFERS {selectedDigit}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {/* Bot settings */}
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <div>
+                  <div className={`text-xs mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Martingale x</div>
+                  <input type="number" value={martingale} onChange={(e) => setMartingale(Number(e.target.value))}
+                    className={`w-full rounded-lg px-3 py-2 outline-none border text-sm ${isDark ? 'bg-[#150d24] text-white border-purple-500/20' : 'bg-gray-50 text-gray-900 border-gray-200'}`} />
+                </div>
+                <div>
+                  <div className={`text-xs mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Max runs</div>
+                  <input type="number" value={maxRuns} onChange={(e) => setMaxRuns(Number(e.target.value))}
+                    className={`w-full rounded-lg px-3 py-2 outline-none border text-sm ${isDark ? 'bg-[#150d24] text-white border-purple-500/20' : 'bg-gray-50 text-gray-900 border-gray-200'}`} />
                 </div>
               </div>
 
-              <div className={`flex justify-between items-center p-3 rounded-lg mb-3 ${isDark ? 'bg-[#150d24]' : 'bg-gray-50'}`}>
-                <div className={`text-xs flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                  <Zap className="w-3 h-3 text-purple-400" /> Potential payout
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <div>
+                  <div className={`text-xs mb-1 flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                    <span className="text-emerald-400">◉</span> Target profit ($)
+                  </div>
+                  <input type="number" value={targetProfit} onChange={(e) => setTargetProfit(Number(e.target.value))}
+                    className={`w-full rounded-lg px-3 py-2 outline-none border text-sm ${isDark ? 'bg-[#150d24] text-white border-purple-500/20' : 'bg-gray-50 text-gray-900 border-gray-200'}`} />
                 </div>
-                <div className="text-purple-400 font-bold">${potentialPayout.toFixed(2)}</div>
+                <div>
+                  <div className={`text-xs mb-1 flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                    <span className="text-red-400">◉</span> Stop loss ($)
+                  </div>
+                  <input type="number" value={stopLoss} onChange={(e) => setStopLoss(Number(e.target.value))}
+                    className={`w-full rounded-lg px-3 py-2 outline-none border text-sm ${isDark ? 'bg-[#150d24] text-white border-purple-500/20' : 'bg-gray-50 text-gray-900 border-gray-200'}`} />
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <button onClick={() => executeTrade('RISE')} disabled={isTrading}
-                  className="py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition disabled:opacity-50">
-                  <div className="flex flex-col items-center">
-                    <span className="font-bold text-sm">↑ RISE</span>
-                    <span className="text-[10px] opacity-80">higher</span>
-                  </div>
-                </button>
-                <button onClick={() => executeTrade('FALL')} disabled={isTrading}
-                  className="py-4 bg-red-600 hover:bg-red-500 text-white rounded-xl transition disabled:opacity-50">
-                  <div className="flex flex-col items-center">
-                    <span className="font-bold text-sm">↓ FALL</span>
-                    <span className="text-[10px] opacity-80">lower</span>
-                  </div>
-                </button>
-              </div>
+              <button onClick={() => setIsBotRunning(!isBotRunning)}
+                className={`w-full py-3 bg-purple-500 hover:bg-purple-600 text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 mb-2`}>
+                <Play className="w-4 h-4" /> {isBotRunning ? 'Stop bot' : 'Start bot'}
+              </button>
+
+              <p className={`text-[10px] leading-relaxed ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+                ℹ️ The bot auto-places trades and multiplies your stake after a loss (martingale). It stops at your target profit, stop loss, or max runs. Keep this tab open while it runs.
+              </p>
             </>
           )}
 
-          {/* DIGITS */}
-          {tradeType === 'digits' && (
+          {/* ═══════ MANUAL MODE ═══════ */}
+          {tradeMode === 'manual' && (
             <>
-              <div className="grid grid-cols-3 gap-1.5 mb-3">
-                <button onClick={() => setDigitMode('over-under')}
-                  className={`py-2 rounded-lg text-xs font-medium ${digitMode === 'over-under' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
-                  Over / Under
-                </button>
-                <button onClick={() => setDigitMode('even-odd')}
-                  className={`py-2 rounded-lg text-xs font-medium ${digitMode === 'even-odd' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
-                  Even / Odd
-                </button>
-                <button onClick={() => setDigitMode('matches-differs')}
-                  className={`py-2 rounded-lg text-xs font-medium ${digitMode === 'matches-differs' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
-                  Matches / Differs
-                </button>
-              </div>
+              {/* RISE/FALL manual */}
+              {tradeType === 'rise-fall' && (
+                <>
+                  <div className="mb-3">
+                    <div className={`text-xs mb-2 flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                      <Clock className="w-3 h-3" /> Duration
+                    </div>
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {[{ v: 15, l: '15s' }, { v: 30, l: '30s' }, { v: 60, l: '1m' }, { v: 120, l: '2m' }, { v: 300, l: '5m' }].map((d) => (
+                        <button key={d.v} onClick={() => setDuration(d.v)}
+                          className={`py-2 rounded-lg text-xs font-medium ${duration === d.v ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                          {d.l}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
-              <div className={`flex items-center justify-between p-3 rounded-lg mb-3 ${isDark ? 'bg-[#150d24]' : 'bg-gray-50'}`}>
-                <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Barrier digit</span>
-                <div className="flex items-center gap-2">
-                  <span className="w-8 h-8 rounded-lg bg-purple-600 text-white font-bold flex items-center justify-center">{selectedDigit}</span>
-                  <span className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>tap chart digits</span>
-                </div>
-              </div>
+                  <div className={`flex justify-between items-center p-3 rounded-lg mb-3 ${isDark ? 'bg-[#150d24]' : 'bg-gray-50'}`}>
+                    <div className={`text-xs flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                      <Zap className="w-3 h-3 text-purple-400" /> Potential payout
+                    </div>
+                    <div className="text-purple-400 font-bold">${potentialPayout.toFixed(2)}</div>
+                  </div>
 
-              {digitMode === 'over-under' && (
-                <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => { setDigitSide('OVER'); executeTrade('OVER') }} disabled={isTrading}
-                    className={`py-3 text-white rounded-xl transition disabled:opacity-50 ${digitSide === 'OVER' ? 'bg-emerald-500 ring-2 ring-emerald-400' : 'bg-emerald-600 hover:bg-emerald-500'}`}>
-                    <div className="flex items-center justify-between px-2">
-                      <span className="font-bold text-xs">OVER {selectedDigit}</span>
-                      <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+{overPercent}%</span>
-                    </div>
-                    <div className="text-[10px] opacity-90 mt-0.5 px-2 text-left">Payout ${(stake * overMultiplier).toFixed(2)}</div>
-                  </button>
-                  <button onClick={() => { setDigitSide('UNDER'); executeTrade('UNDER') }} disabled={isTrading}
-                    className={`py-3 text-white rounded-xl transition disabled:opacity-50 ${digitSide === 'UNDER' ? 'bg-red-500 ring-2 ring-red-400' : 'bg-red-600 hover:bg-red-500'}`}>
-                    <div className="flex items-center justify-between px-2">
-                      <span className="font-bold text-xs">UNDER {selectedDigit}</span>
-                      <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+{underPercent}%</span>
-                    </div>
-                    <div className="text-[10px] opacity-90 mt-0.5 px-2 text-left">Payout ${(stake * underMultiplier).toFixed(2)}</div>
-                  </button>
-                </div>
-              )}
-
-              {digitMode === 'even-odd' && (
-                <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => { setDigitSide('EVEN'); executeTrade('EVEN') }} disabled={isTrading}
-                    className={`py-3 text-white rounded-xl transition disabled:opacity-50 ${digitSide === 'EVEN' ? 'bg-emerald-500 ring-2 ring-emerald-400' : 'bg-emerald-600 hover:bg-emerald-500'}`}>
-                    <div className="flex items-center justify-between px-2">
-                      <span className="font-bold text-xs">EVEN</span>
-                      <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+95%</span>
-                    </div>
-                    <div className="text-[10px] opacity-90 mt-0.5 px-2 text-left">Payout ${(stake * 1.95).toFixed(2)}</div>
-                  </button>
-                  <button onClick={() => { setDigitSide('ODD'); executeTrade('ODD') }} disabled={isTrading}
-                    className={`py-3 text-white rounded-xl transition disabled:opacity-50 ${digitSide === 'ODD' ? 'bg-red-500 ring-2 ring-red-400' : 'bg-red-600 hover:bg-red-500'}`}>
-                    <div className="flex items-center justify-between px-2">
-                      <span className="font-bold text-xs">ODD</span>
-                      <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+95%</span>
-                    </div>
-                    <div className="text-[10px] opacity-90 mt-0.5 px-2 text-left">Payout ${(stake * 1.95).toFixed(2)}</div>
-                  </button>
-                </div>
-              )}
-
-              {digitMode === 'matches-differs' && (
-                <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => { setDigitSide('MATCHES'); executeTrade('MATCHES') }} disabled={isTrading}
-                    className={`py-3 text-white rounded-xl transition disabled:opacity-50 ${digitSide === 'MATCHES' ? 'bg-emerald-500 ring-2 ring-emerald-400' : 'bg-emerald-600 hover:bg-emerald-500'}`}>
-                    <div className="flex items-center justify-between px-2">
-                      <span className="font-bold text-xs">MATCHES {selectedDigit}</span>
-                      <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+800%</span>
-                    </div>
-                    <div className="text-[10px] opacity-90 mt-0.5 px-2 text-left">Payout ${(stake * 9).toFixed(2)}</div>
-                  </button>
-                  <button onClick={() => { setDigitSide('DIFFERS'); executeTrade('DIFFERS') }} disabled={isTrading}
-                    className={`py-3 text-white rounded-xl transition disabled:opacity-50 ${digitSide === 'DIFFERS' ? 'bg-red-500 ring-2 ring-red-400' : 'bg-red-600 hover:bg-red-500'}`}>
-                    <div className="flex items-center justify-between px-2">
-                      <span className="font-bold text-xs">DIFFERS</span>
-                      <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+9%</span>
-                    </div>
-                    <div className="text-[10px] opacity-90 mt-0.5 px-2 text-left">Payout ${(stake * 1.09).toFixed(2)}</div>
-                  </button>
-                </div>
-              )}
-            </>
-          )}
-
-          {/* MULTIPLIERS */}
-          {tradeType === 'multipliers' && (
-            <>
-              <div className="mb-3">
-                <div className={`text-xs mb-2 flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                  📈 Multiplier
-                </div>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {[100, 200, 400, 1000].map((m) => (
-                    <button key={m} onClick={() => setMultiplier(m)}
-                      className={`py-2 rounded-lg text-xs font-medium ${multiplier === m ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
-                      x{m}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button onClick={() => executeTrade('RISE')} disabled={isTrading}
+                      className="py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition disabled:opacity-50">
+                      <div className="flex flex-col items-center">
+                        <span className="font-bold text-sm">↑ RISE</span>
+                        <span className="text-[10px] opacity-80">higher</span>
+                      </div>
                     </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className={`p-3 rounded-lg mb-3 ${isDark ? 'bg-[#150d24]' : 'bg-gray-50'}`}>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className={isDark ? 'text-gray-400' : 'text-gray-600'}>P&L moves</span>
-                  <span className="text-purple-400 font-medium">{multiplier}x market</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className={isDark ? 'text-gray-400' : 'text-gray-600'}>Stop out at</span>
-                  <span className="text-red-400 font-medium">
-                    {multiplier === 100 ? '1.00% move' :
-                     multiplier === 200 ? '0.50% move' :
-                     multiplier === 400 ? '0.25% move' :
-                     multiplier === 1000 ? '0.10% move' : '1.00% move'}
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <button onClick={() => executeTrade('UP')} disabled={isTrading}
-                  className="py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition disabled:opacity-50">
-                  <div className="flex flex-col items-center">
-                    <span className="font-bold text-sm">↑ UP</span>
-                    <span className="text-[10px] opacity-80">higher</span>
+                    <button onClick={() => executeTrade('FALL')} disabled={isTrading}
+                      className="py-4 bg-red-600 hover:bg-red-500 text-white rounded-xl transition disabled:opacity-50">
+                      <div className="flex flex-col items-center">
+                        <span className="font-bold text-sm">↓ FALL</span>
+                        <span className="text-[10px] opacity-80">lower</span>
+                      </div>
+                    </button>
                   </div>
-                </button>
-                <button onClick={() => executeTrade('DOWN')} disabled={isTrading}
-                  className="py-4 bg-red-600 hover:bg-red-500 text-white rounded-xl transition disabled:opacity-50">
-                  <div className="flex flex-col items-center">
-                    <span className="font-bold text-sm">↓ DOWN</span>
-                    <span className="text-[10px] opacity-80">lower</span>
+                </>
+              )}
+
+              {/* DIGITS manual */}
+              {tradeType === 'digits' && (
+                <>
+                  <div className="grid grid-cols-3 gap-1.5 mb-3">
+                    <button onClick={() => setDigitMode('over-under')}
+                      className={`py-2 rounded-lg text-xs font-medium ${digitMode === 'over-under' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
+                      Over / Under
+                    </button>
+                    <button onClick={() => setDigitMode('even-odd')}
+                      className={`py-2 rounded-lg text-xs font-medium ${digitMode === 'even-odd' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
+                      Even / Odd
+                    </button>
+                    <button onClick={() => setDigitMode('matches-differs')}
+                      className={`py-2 rounded-lg text-xs font-medium ${digitMode === 'matches-differs' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
+                      Matches / Differs
+                    </button>
                   </div>
-                </button>
-              </div>
+
+                  <div className={`flex items-center justify-between p-3 rounded-lg mb-3 ${isDark ? 'bg-[#150d24]' : 'bg-gray-50'}`}>
+                    <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                      {digitMode === 'matches-differs' ? 'Target digit' : 'Barrier digit'}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="w-8 h-8 rounded-lg bg-purple-600 text-white font-bold flex items-center justify-center">{selectedDigit}</span>
+                      <span className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>tap chart digits</span>
+                    </div>
+                  </div>
+
+                  {digitMode === 'over-under' && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <button onClick={() => { setDigitSide('OVER'); executeTrade('OVER') }} disabled={isTrading}
+                        className={`py-3 text-white rounded-xl transition disabled:opacity-50 ${digitSide === 'OVER' ? 'bg-emerald-500 ring-2 ring-emerald-400' : 'bg-emerald-600 hover:bg-emerald-500'}`}>
+                        <div className="flex items-center justify-between px-2">
+                          <span className="font-bold text-xs">OVER {selectedDigit}</span>
+                          <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+{overPercent}%</span>
+                        </div>
+                        <div className="text-[10px] opacity-90 mt-0.5 px-2 text-left">Payout ${(stake * overMultiplier).toFixed(2)}</div>
+                      </button>
+                      <button onClick={() => { setDigitSide('UNDER'); executeTrade('UNDER') }} disabled={isTrading}
+                        className={`py-3 text-white rounded-xl transition disabled:opacity-50 ${digitSide === 'UNDER' ? 'bg-red-500 ring-2 ring-red-400' : 'bg-red-600 hover:bg-red-500'}`}>
+                        <div className="flex items-center justify-between px-2">
+                          <span className="font-bold text-xs">UNDER {selectedDigit}</span>
+                          <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+{underPercent}%</span>
+                        </div>
+                        <div className="text-[10px] opacity-90 mt-0.5 px-2 text-left">Payout ${(stake * underMultiplier).toFixed(2)}</div>
+                      </button>
+                    </div>
+                  )}
+
+                  {digitMode === 'even-odd' && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <button onClick={() => { setDigitSide('EVEN'); executeTrade('EVEN') }} disabled={isTrading}
+                        className={`py-3 text-white rounded-xl transition disabled:opacity-50 ${digitSide === 'EVEN' ? 'bg-emerald-500 ring-2 ring-emerald-400' : 'bg-emerald-600 hover:bg-emerald-500'}`}>
+                        <div className="flex items-center justify-between px-2">
+                          <span className="font-bold text-xs">EVEN</span>
+                          <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+95%</span>
+                        </div>
+                        <div className="text-[10px] opacity-90 mt-0.5 px-2 text-left">Payout ${(stake * 1.95).toFixed(2)}</div>
+                      </button>
+                      <button onClick={() => { setDigitSide('ODD'); executeTrade('ODD') }} disabled={isTrading}
+                        className={`py-3 text-white rounded-xl transition disabled:opacity-50 ${digitSide === 'ODD' ? 'bg-red-500 ring-2 ring-red-400' : 'bg-red-600 hover:bg-red-500'}`}>
+                        <div className="flex items-center justify-between px-2">
+                          <span className="font-bold text-xs">ODD</span>
+                          <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+95%</span>
+                        </div>
+                        <div className="text-[10px] opacity-90 mt-0.5 px-2 text-left">Payout ${(stake * 1.95).toFixed(2)}</div>
+                      </button>
+                    </div>
+                  )}
+
+                  {digitMode === 'matches-differs' && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <button onClick={() => { setDigitSide('MATCHES'); executeTrade('MATCHES') }} disabled={isTrading}
+                        className={`py-3 text-white rounded-xl transition disabled:opacity-50 ${digitSide === 'MATCHES' ? 'bg-emerald-500 ring-2 ring-emerald-400' : 'bg-emerald-600 hover:bg-emerald-500'}`}>
+                        <div className="flex items-center justify-between px-2">
+                          <span className="font-bold text-xs">MATCHES {selectedDigit}</span>
+                          <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+800%</span>
+                        </div>
+                        <div className="text-[10px] opacity-90 mt-0.5 px-2 text-left">Payout ${(stake * 9).toFixed(2)}</div>
+                      </button>
+                      <button onClick={() => { setDigitSide('DIFFERS'); executeTrade('DIFFERS') }} disabled={isTrading}
+                        className={`py-3 text-white rounded-xl transition disabled:opacity-50 ${digitSide === 'DIFFERS' ? 'bg-red-500 ring-2 ring-red-400' : 'bg-red-600 hover:bg-red-500'}`}>
+                        <div className="flex items-center justify-between px-2">
+                          <span className="font-bold text-xs">DIFFERS</span>
+                          <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+9%</span>
+                        </div>
+                        <div className="text-[10px] opacity-90 mt-0.5 px-2 text-left">Payout ${(stake * 1.09).toFixed(2)}</div>
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* MULTIPLIERS manual */}
+              {tradeType === 'multipliers' && (
+                <>
+                  <div className="mb-3">
+                    <div className={`text-xs mb-2 flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                      📈 Multiplier
+                    </div>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {[100, 200, 400, 1000].map((m) => (
+                        <button key={m} onClick={() => setMultiplier(m)}
+                          className={`py-2 rounded-lg text-xs font-medium ${multiplier === m ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                          x{m}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className={`p-3 rounded-lg mb-3 ${isDark ? 'bg-[#150d24]' : 'bg-gray-50'}`}>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className={isDark ? 'text-gray-400' : 'text-gray-600'}>P&L moves</span>
+                      <span className="text-purple-400 font-medium">{multiplier}x market</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className={isDark ? 'text-gray-400' : 'text-gray-600'}>Stop out at</span>
+                      <span className="text-red-400 font-medium">
+                        {multiplier === 100 ? '1.00% move' :
+                         multiplier === 200 ? '0.50% move' :
+                         multiplier === 400 ? '0.25% move' :
+                         multiplier === 1000 ? '0.10% move' : '1.00% move'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <button onClick={() => executeTrade('UP')} disabled={isTrading}
+                      className="py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition disabled:opacity-50">
+                      <div className="flex flex-col items-center">
+                        <span className="font-bold text-sm">↑ UP</span>
+                        <span className="text-[10px] opacity-80">higher</span>
+                      </div>
+                    </button>
+                    <button onClick={() => executeTrade('DOWN')} disabled={isTrading}
+                      className="py-4 bg-red-600 hover:bg-red-500 text-white rounded-xl transition disabled:opacity-50">
+                      <div className="flex flex-col items-center">
+                        <span className="font-bold text-sm">↓ DOWN</span>
+                        <span className="text-[10px] opacity-80">lower</span>
+                      </div>
+                    </button>
+                  </div>
+                </>
+              )}
             </>
           )}
 
