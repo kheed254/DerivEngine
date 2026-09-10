@@ -60,6 +60,27 @@ export default function HomePage() {
     return () => subscription.unsubscribe()
   }, [])
 
+  // Reset price when market changes
+  useEffect(() => {
+    if (!showDashboard) return
+    const basePrices: { [key: string]: number } = {
+      'Volatility 100 (1s) Index': 730,
+      'Volatility 100 Index': 1500,
+      'Volatility 75 (1s) Index': 98000,
+      'Volatility 75 Index': 98000,
+      'Volatility 50 (1s) Index': 240,
+      'Volatility 50 Index': 240,
+      'Volatility 25 (1s) Index': 2800,
+      'Volatility 25 Index': 2800,
+      'Volatility 10 (1s) Index': 6500,
+      'Volatility 10 Index': 6500,
+    }
+    const base = basePrices[selectedMarket] || 730
+    setPrice(base)
+    const digit = Math.floor(base * 100) % 10
+    setLastDigit(digit)
+  }, [selectedMarket, showDashboard])
+
   // Connect to Deriv for live prices + always-on simulation
   useEffect(() => {
     let derivClient: DerivClient
@@ -81,7 +102,6 @@ export default function HomePage() {
         setIsDerivConnected(false)
       }
 
-      // Always run a price simulation as a heartbeat
       fallbackInterval = setInterval(() => {
         if (!isMounted) return
         setPrice((prev) => {
@@ -102,7 +122,7 @@ export default function HomePage() {
     }
   }, [])
 
-  // Setup chart
+  // Setup chart — re-runs when market changes
   useEffect(() => {
     if (!showDashboard) return
 
@@ -111,7 +131,6 @@ export default function HomePage() {
     const initChart = async () => {
       try {
         const container = chartRef.current
-        console.log('🔍 Chart container:', container ? 'FOUND' : 'MISSING', container?.clientWidth, 'x', container?.clientHeight)
         if (!container) {
           timeout = setTimeout(initChart, 500)
           return
@@ -171,12 +190,28 @@ export default function HomePage() {
           throw new Error('No compatible chart series method found')
         }
 
-        // Generate historical data
+        // Base starting price depending on market
+        const basePrices: { [key: string]: number } = {
+          'Volatility 100 (1s) Index': 730,
+          'Volatility 100 Index': 1500,
+          'Volatility 75 (1s) Index': 98000,
+          'Volatility 75 Index': 98000,
+          'Volatility 50 (1s) Index': 240,
+          'Volatility 50 Index': 240,
+          'Volatility 25 (1s) Index': 2800,
+          'Volatility 25 Index': 2800,
+          'Volatility 10 (1s) Index': 6500,
+          'Volatility 10 Index': 6500,
+        }
+        const startPrice = basePrices[selectedMarket] || 730
+        // Volatility scale — higher indices swing more
+        const volatility = Math.max(1, startPrice * 0.005)
+
         const now = Math.floor(Date.now() / 1000)
         const initialData: { time: number; value: number }[] = []
-        let basePrice = 730
+        let basePrice = startPrice
         for (let i = 200; i >= 0; i--) {
-          basePrice = basePrice + (Math.random() - 0.5) * 2
+          basePrice = basePrice + (Math.random() - 0.5) * volatility
           initialData.push({
             time: now - i * 3,
             value: Math.round(basePrice * 100) / 100,
@@ -188,7 +223,7 @@ export default function HomePage() {
         chartInstance.current = chart
         priceHistoryRef.current = initialData
 
-        console.log('✅ Chart initialized with', initialData.length, 'points')
+        console.log('✅ Chart initialized for', selectedMarket, 'with', initialData.length, 'points')
       } catch (err) {
         console.error('❌ Chart init error:', err)
       }
@@ -215,9 +250,9 @@ export default function HomePage() {
         seriesRef.current = null
       }
     }
-  }, [showDashboard, isLoggedIn])
+  }, [showDashboard, isLoggedIn, selectedMarket])
 
-  // Update chart with live price — runs on a 1s ticker so it always moves
+  // Update chart with live price — runs on a 1s ticker
   useEffect(() => {
     if (!showDashboard) return
 
@@ -240,7 +275,7 @@ export default function HomePage() {
     const interval = setInterval(tick, 1000)
     tick()
     return () => clearInterval(interval)
-  }, [showDashboard, price])
+  }, [showDashboard, price, selectedMarket])
 
   // Execute a trade
   const executeTrade = async (prediction: 'RISE' | 'FALL' | 'DIGIT') => {
