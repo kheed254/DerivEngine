@@ -195,9 +195,9 @@ export default function HomePage() {
         <header className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center">
-              <span className="text-white font-bold text-sm">S</span>
+              <span className="text-white font-bold text-sm">D</span>
             </div>
-            <span className="text-white font-bold text-lg">SinTrades</span>
+            <span className="text-white font-bold text-lg">DerivEngine</span>
           </div>
           <div className="flex items-center gap-3">
             <button className="w-9 h-9 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
@@ -404,9 +404,9 @@ export default function HomePage() {
           <div className="max-w-7xl mx-auto px-6 text-center">
             <div className="flex items-center justify-center gap-2 mb-4">
               <div className="w-6 h-6 rounded bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center">
-                <span className="text-white font-bold text-xs">S</span>
+                <span className="text-white font-bold text-xs">D</span>
               </div>
-              <span className="text-white font-bold">SinTrades</span>
+              <span className="text-white font-bold">DerivEngine</span>
             </div>
             <div className="flex flex-wrap justify-center gap-6 text-sm text-gray-400 mb-4">
               <Link href="#" className="hover:text-white">How it works</Link>
@@ -418,7 +418,7 @@ export default function HomePage() {
               Trading volatility indices involves risk and may not be suitable for everyone. 
               Only trade with money you can afford to lose. Prices are provided by the Deriv synthetic-index feed.
             </p>
-            <p className="text-xs text-gray-600 mt-4">© 2026 SinTrades. All rights reserved.</p>
+            <p className="text-xs text-gray-600 mt-4">© 2026 DerivEngine. All rights reserved.</p>
           </div>
         </footer>
       </main>
@@ -433,7 +433,7 @@ export default function HomePage() {
       {/* Header */}
       <header className="flex justify-between items-center py-4">
         <div>
-          <h1 className="text-xl font-bold text-purple-400">SinTrades</h1>
+          <h1 className="text-xl font-bold text-purple-400">DerivEngine</h1>
           <p className="text-[10px] text-gray-500">Live Volatility Index Trading</p>
         </div>
         <div className="flex items-center gap-2">
