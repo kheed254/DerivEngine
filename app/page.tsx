@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { DerivClient } from '@/lib/derivClient'
-import { TrendingUp, TrendingDown, Wallet, Loader2, ChevronDown, LogOut } from 'lucide-react'
+import { Loader2, ChevronDown, LogOut } from 'lucide-react'
 
 export default function HomePage() {
   const [price, setPrice] = useState(730.69)
@@ -12,7 +12,7 @@ export default function HomePage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [isDerivConnected, setIsDerivConnected] = useState(false)
-  const [balance, setBalance] = useState(0)
+  const [balance, setBalance] = useState(10000)
   const [isLiveMode, setIsLiveMode] = useState(false)
   const [stake, setStake] = useState(10)
   const [selectedMarket, setSelectedMarket] = useState('Volatility 100 (1s) Index')
@@ -26,7 +26,7 @@ export default function HomePage() {
   const [selectedDigit, setSelectedDigit] = useState<number>(5)
   const [showDashboard, setShowDashboard] = useState(false)
   const [digitHistory] = useState<number[]>([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
-  const [digitPercentages] = useState<number[]>([12, 8, 14, 10, 8, 14, 10, 8, 10, 8])
+  const [digitPercentages] = useState<number[]>([4, 12, 10, 12, 20, 8, 8, 18, 0, 14])
 
   const chartRef = useRef<HTMLDivElement>(null)
   const chartInstance = useRef<any>(null)
@@ -103,8 +103,7 @@ export default function HomePage() {
   useEffect(() => {
     if (!showDashboard) return
 
-    let chart: any
-    let series: any
+    let timeout: NodeJS.Timeout
 
     const initChart = async () => {
       const { createChart } = await import('lightweight-charts')
@@ -116,7 +115,7 @@ export default function HomePage() {
         chartInstance.current.remove()
       }
 
-      chart = createChart(container, {
+      chartInstance.current = createChart(container, {
         width: container.clientWidth,
         height: 400,
         layout: {
@@ -139,15 +138,14 @@ export default function HomePage() {
         },
       })
 
-      series = chart.addLineSeries({
-        color: '#a855f7',
+      seriesRef.current = chartInstance.current.addAreaSeries({
+        lineColor: '#a855f7',
+        topColor: 'rgba(168, 85, 247, 0.4)',
+        bottomColor: 'rgba(168, 85, 247, 0.01)',
         lineWidth: 2,
         priceLineVisible: false,
         lastValueVisible: true,
       })
-
-      chartInstance.current = chart
-      seriesRef.current = series
 
       // Mock historical data
       const now = Math.floor(Date.now() / 1000)
@@ -161,10 +159,10 @@ export default function HomePage() {
         })
       }
       priceHistoryRef.current = initialData
-      series.setData(initialData)
+      seriesRef.current.setData(initialData)
     }
 
-    initChart()
+    timeout = setTimeout(initChart, 150)
 
     const handleResize = () => {
       const container = chartRef.current
@@ -177,6 +175,7 @@ export default function HomePage() {
     window.addEventListener('resize', handleResize)
 
     return () => {
+      clearTimeout(timeout)
       window.removeEventListener('resize', handleResize)
       if (chartInstance.current) {
         chartInstance.current.remove()
@@ -265,7 +264,7 @@ export default function HomePage() {
   ]
 
   // ═══════════════════════════════════════════════
-  // LANDING PAGE (if not logged in)
+  // LANDING PAGE
   // ═══════════════════════════════════════════════
   if (!showDashboard) {
     return (
@@ -337,14 +336,13 @@ export default function HomePage() {
   }
 
   // ═══════════════════════════════════════════════
-  // DASHBOARD (SinTrades Style - Full Desktop)
+  // DASHBOARD
   // ═══════════════════════════════════════════════
   return (
     <main className={`min-h-screen ${isDark ? 'bg-[#0a0613] text-white' : 'bg-gray-50 text-gray-900'}`}>
       {/* Top Navigation */}
       <nav className={`border-b ${isDark ? 'border-purple-500/20 bg-[#0d0818]' : 'border-gray-200 bg-white'}`}>
         <div className="px-6 py-3 flex items-center justify-between flex-wrap gap-3">
-          {/* Left: Logo + Nav */}
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center">
@@ -369,18 +367,20 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Right: Account + Deposit */}
           <div className="flex items-center gap-3">
             <div className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs ${isDark ? 'bg-purple-500/10 border border-purple-500/30' : 'bg-purple-50 border border-purple-200'}`}>
               <span className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></span>
-              <span className="text-purple-400 font-medium">LIVE ACCOUNT</span>
+              <span className="text-purple-400 font-medium">{isLiveMode ? 'LIVE ACCOUNT' : 'DEMO ACCOUNT'}</span>
             </div>
 
-            <div className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs ${isDark ? 'bg-white/5' : 'bg-gray-100'}`}>
+            <button
+              onClick={() => setIsLiveMode(!isLiveMode)}
+              className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs ${isDark ? 'bg-white/5' : 'bg-gray-100'}`}
+            >
               <span className="text-purple-400 font-bold">$</span>
               <span className={isDark ? 'text-white' : 'text-gray-900'}>{balance.toFixed(2)}</span>
               <ChevronDown className="w-3 h-3 text-gray-400" />
-            </div>
+            </button>
 
             <button className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium flex items-center gap-2">
               <span>↓</span> Deposit
@@ -437,25 +437,33 @@ export default function HomePage() {
                 <div className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>{pos.type} · ${pos.stake}</div>
               </div>
             ))}
+            {activeTab === 'closed' && closedPositions.map((pos) => (
+              <div key={pos.id} className={`mb-2 p-2 rounded-lg text-left ${isDark ? 'bg-[#150d24]' : 'bg-gray-50'}`}>
+                <div className="flex justify-between text-xs">
+                  <span>{pos.market}</span>
+                  <span className={pos.result === 'WIN' ? 'text-purple-400' : 'text-red-400'}>
+                    {pos.result === 'WIN' ? '+' : ''}${pos.payout.toFixed(2)}
+                  </span>
+                </div>
+                <div className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>{pos.type} · ${pos.stake}</div>
+              </div>
+            ))}
           </div>
         </div>
 
         {/* MIDDLE: Chart + Digits */}
         <div className={`lg:col-span-7 rounded-2xl border p-4 ${isDark ? 'bg-[#0d0818] border-purple-500/20' : 'bg-white border-gray-200'}`}>
-          {/* Market Header */}
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <div className="flex items-center gap-3">
-              <button className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-100'}`}>
-                <select
-                  value={selectedMarket}
-                  onChange={(e) => setSelectedMarket(e.target.value)}
-                  className={`bg-transparent font-semibold outline-none cursor-pointer ${isDark ? 'text-white' : 'text-gray-900'}`}
-                >
-                  {markets.map((m) => (
-                    <option key={m} value={m} className={isDark ? 'bg-[#150d24]' : 'bg-white'}>{m}</option>
-                  ))}
-                </select>
-              </button>
+              <select
+                value={selectedMarket}
+                onChange={(e) => setSelectedMarket(e.target.value)}
+                className={`font-semibold outline-none cursor-pointer bg-transparent ${isDark ? 'text-white' : 'text-gray-900'}`}
+              >
+                {markets.map((m) => (
+                  <option key={m} value={m} className={isDark ? 'bg-[#150d24]' : 'bg-white'}>{m}</option>
+                ))}
+              </select>
               <span className="text-xs bg-purple-500/10 text-purple-400 px-2 py-1 rounded-full flex items-center gap-1">
                 <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-pulse"></span>
                 LIVE
@@ -474,18 +482,17 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* High/Low */}
           <div className="flex gap-4 text-xs mb-3">
             <div className={isDark ? 'text-gray-400' : 'text-gray-600'}>
-              High <span className="text-purple-400">735.59</span>
+              High <span className="text-purple-400">{(price + 5).toFixed(2)}</span>
             </div>
             <div className={isDark ? 'text-gray-400' : 'text-gray-600'}>
-              Low <span className="text-purple-400">729.33</span>
+              Low <span className="text-purple-400">{(price - 5).toFixed(2)}</span>
             </div>
           </div>
 
-          {/* Chart */}
-          <div ref={chartRef} className="w-full rounded-lg overflow-hidden" />
+          {/* Chart - with explicit height */}
+          <div ref={chartRef} className="w-full rounded-lg overflow-hidden" style={{ height: '400px' }} />
 
           {/* Live Last Digits */}
           <div className="mt-4">
@@ -518,7 +525,6 @@ export default function HomePage() {
 
         {/* RIGHT: Trading Panel */}
         <div className={`lg:col-span-3 rounded-2xl border p-4 ${isDark ? 'bg-[#0d0818] border-purple-500/20' : 'bg-white border-gray-200'}`}>
-          {/* Manual / Auto / AI */}
           <div className="flex gap-2 mb-4">
             <button className="flex-1 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium">Manual</button>
             <button className={`flex-1 py-2 rounded-lg text-sm font-medium ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Auto</button>
@@ -527,7 +533,6 @@ export default function HomePage() {
             </button>
           </div>
 
-          {/* Trade Type Tabs */}
           <div className="flex gap-2 mb-4">
             <button
               onClick={() => setTradeType('rise-fall')}
@@ -549,7 +554,6 @@ export default function HomePage() {
             </button>
           </div>
 
-          {/* Stake */}
           <div className="mb-4">
             <div className="flex justify-between items-center mb-2">
               <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Stake (USD)</span>
@@ -576,7 +580,6 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Quick Stake */}
           <div className="grid grid-cols-4 gap-2 mb-4">
             {[1, 5, 10, 25].map((val) => (
               <button
@@ -589,7 +592,6 @@ export default function HomePage() {
             ))}
           </div>
 
-          {/* Trade Options (Rise/Fall) */}
           {tradeType === 'rise-fall' && (
             <>
               <div className="grid grid-cols-2 gap-2 mb-4">
@@ -622,7 +624,6 @@ export default function HomePage() {
             </>
           )}
 
-          {/* Digits Trade */}
           {tradeType === 'digits' && (
             <>
               <div className={`p-3 rounded-lg mb-4 ${isDark ? 'bg-[#150d24]' : 'bg-gray-50'}`}>
@@ -641,14 +642,12 @@ export default function HomePage() {
             </>
           )}
 
-          {/* Multipliers */}
           {tradeType === 'multipliers' && (
             <div className={`p-4 rounded-xl text-center text-xs ${isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-50 text-gray-500'}`}>
               Multipliers coming soon
             </div>
           )}
 
-          {/* Trade Result */}
           {tradeResult && (
             <div className={`mt-4 p-3 rounded-lg text-center text-sm ${tradeResult.includes('won') ? 'bg-purple-500/20 text-purple-300' : 'bg-red-500/20 text-red-300'}`}>
               {tradeResult}
