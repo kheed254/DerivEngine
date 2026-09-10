@@ -15,7 +15,6 @@ export default function HomePage() {
   const [balance, setBalance] = useState(0)
   const [isLiveMode, setIsLiveMode] = useState(false)
   const [stake, setStake] = useState(10)
-  const [duration, setDuration] = useState(1)
   const [selectedMarket, setSelectedMarket] = useState('Volatility 100 (1s) Index')
   const [isTrading, setIsTrading] = useState(false)
   const [tradeResult, setTradeResult] = useState<string | null>(null)
@@ -26,13 +25,8 @@ export default function HomePage() {
   const [tradeType, setTradeType] = useState<'rise-fall' | 'digits' | 'multipliers'>('rise-fall')
   const [selectedDigit, setSelectedDigit] = useState<number>(5)
   const [showDashboard, setShowDashboard] = useState(false)
-  const [winners, setWinners] = useState([
-    { name: 'Ann M.', amount: 10.00, market: 'V100 1s' },
-    { name: 'Aisha I.', amount: 9.00, market: 'V100 1s' },
-    { name: 'Michael C.', amount: 5.00, market: 'V100 1s' },
-  ])
-  const [digitHistory, setDigitHistory] = useState<number[]>([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
-  const [digitPercentages, setDigitPercentages] = useState<number[]>([12, 8, 14, 10, 8, 14, 10, 8, 10, 8])
+  const [digitHistory] = useState<number[]>([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+  const [digitPercentages] = useState<number[]>([12, 8, 14, 10, 8, 14, 10, 8, 10, 8])
 
   const chartRef = useRef<HTMLDivElement>(null)
   const chartInstance = useRef<any>(null)
@@ -107,7 +101,7 @@ export default function HomePage() {
 
   // Setup chart
   useEffect(() => {
-    if (!showDashboard || !chartRef.current) return
+    if (!showDashboard) return
 
     let chart: any
     let series: any
@@ -115,12 +109,15 @@ export default function HomePage() {
     const initChart = async () => {
       const { createChart } = await import('lightweight-charts')
 
+      const container = chartRef.current
+      if (!container) return
+
       if (chartInstance.current) {
         chartInstance.current.remove()
       }
 
-      chart = createChart(chartRef.current, {
-        width: chartRef.current.clientWidth,
+      chart = createChart(container, {
+        width: container.clientWidth,
         height: 400,
         layout: {
           background: { color: 'transparent' },
@@ -143,7 +140,7 @@ export default function HomePage() {
       })
 
       series = chart.addLineSeries({
-        color: '#10b981',
+        color: '#a855f7',
         lineWidth: 2,
         priceLineVisible: false,
         lastValueVisible: true,
@@ -152,7 +149,7 @@ export default function HomePage() {
       chartInstance.current = chart
       seriesRef.current = series
 
-      // Fill with mock historical data
+      // Mock historical data
       const now = Math.floor(Date.now() / 1000)
       const initialData: { time: number; value: number }[] = []
       let basePrice = 730
@@ -165,24 +162,22 @@ export default function HomePage() {
       }
       priceHistoryRef.current = initialData
       series.setData(initialData)
-
-      const handleResize = () => {
-        if (chartRef.current && chartInstance.current) {
-          chartInstance.current.applyOptions({
-            width: chartRef.current.clientWidth,
-          })
-        }
-      }
-      window.addEventListener('resize', handleResize)
-
-      return () => {
-        window.removeEventListener('resize', handleResize)
-      }
     }
 
     initChart()
 
+    const handleResize = () => {
+      const container = chartRef.current
+      if (container && chartInstance.current) {
+        chartInstance.current.applyOptions({
+          width: container.clientWidth,
+        })
+      }
+    }
+    window.addEventListener('resize', handleResize)
+
     return () => {
+      window.removeEventListener('resize', handleResize)
       if (chartInstance.current) {
         chartInstance.current.remove()
         chartInstance.current = null
@@ -208,13 +203,12 @@ export default function HomePage() {
     }
   }, [price, showDashboard])
 
-  // Simulate trade
+  // Execute a trade
   const executeTrade = async (prediction: 'RISE' | 'FALL' | 'DIGIT') => {
     setIsTrading(true)
     setTradeResult(null)
 
     try {
-      // Simulate outcome
       const result = Math.random() > 0.5 ? 'WIN' : 'LOSS'
       const payout = result === 'WIN' ? stake * 1.9 : 0
 
@@ -343,13 +337,13 @@ export default function HomePage() {
   }
 
   // ═══════════════════════════════════════════════
-  // DASHBOARD (SinTrades Style - Full Desktop Layout)
+  // DASHBOARD (SinTrades Style - Full Desktop)
   // ═══════════════════════════════════════════════
   return (
     <main className={`min-h-screen ${isDark ? 'bg-[#0a0613] text-white' : 'bg-gray-50 text-gray-900'}`}>
       {/* Top Navigation */}
       <nav className={`border-b ${isDark ? 'border-purple-500/20 bg-[#0d0818]' : 'border-gray-200 bg-white'}`}>
-        <div className="px-6 py-3 flex items-center justify-between">
+        <div className="px-6 py-3 flex items-center justify-between flex-wrap gap-3">
           {/* Left: Logo + Nav */}
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2">
@@ -452,16 +446,20 @@ export default function HomePage() {
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <div className="flex items-center gap-3">
               <button className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-100'}`}>
-                <span className="font-semibold">{selectedMarket}</span>
-                <ChevronDown className="w-4 h-4" />
+                <select
+                  value={selectedMarket}
+                  onChange={(e) => setSelectedMarket(e.target.value)}
+                  className={`bg-transparent font-semibold outline-none cursor-pointer ${isDark ? 'text-white' : 'text-gray-900'}`}
+                >
+                  {markets.map((m) => (
+                    <option key={m} value={m} className={isDark ? 'bg-[#150d24]' : 'bg-white'}>{m}</option>
+                  ))}
+                </select>
               </button>
               <span className="text-xs bg-purple-500/10 text-purple-400 px-2 py-1 rounded-full flex items-center gap-1">
                 <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-pulse"></span>
                 LIVE
               </span>
-              <button className={`text-xs flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                🔔 Alert
-              </button>
             </div>
 
             <div className="flex items-center gap-4">
@@ -470,12 +468,8 @@ export default function HomePage() {
                 <div className="text-purple-400 text-2xl font-bold">{lastDigit}</div>
               </div>
               <div className="text-right">
-                <div className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-400'}`}></div>
+                <div className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>PRICE</div>
                 <div className="text-2xl font-bold">{price.toFixed(2)}</div>
-              </div>
-              <div className="text-right">
-                <div className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-400'}`}></div>
-                <div className="text-red-400 text-sm">▼ -15.38%</div>
               </div>
             </div>
           </div>
@@ -559,7 +553,6 @@ export default function HomePage() {
           <div className="mb-4">
             <div className="flex justify-between items-center mb-2">
               <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Stake (USD)</span>
-              <span className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>$0.00</span>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -615,7 +608,7 @@ export default function HomePage() {
                   className="flex-1 py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-bold text-sm transition disabled:opacity-50"
                 >
                   {isTrading ? '...' : 'RISE'}
-                  <div className="text-[10px] font-normal opacity-90">Payout $19.00</div>
+                  <div className="text-[10px] font-normal opacity-90">Payout ${(stake * 1.9).toFixed(2)}</div>
                 </button>
                 <button
                   onClick={() => executeTrade('FALL')}
@@ -623,7 +616,7 @@ export default function HomePage() {
                   className="flex-1 py-4 bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold text-sm transition disabled:opacity-50"
                 >
                   {isTrading ? '...' : 'FALL'}
-                  <div className="text-[10px] font-normal opacity-90">Payout $19.00</div>
+                  <div className="text-[10px] font-normal opacity-90">Payout ${(stake * 1.9).toFixed(2)}</div>
                 </button>
               </div>
             </>
@@ -637,16 +630,14 @@ export default function HomePage() {
                 <div className="text-purple-400 font-bold text-lg">{selectedDigit}</div>
               </div>
 
-              <div className="flex gap-2">
-                <button
-                  onClick={() => executeTrade('DIGIT')}
-                  disabled={isTrading}
-                  className="flex-1 py-4 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition disabled:opacity-50"
-                >
-                  {isTrading ? '...' : `MATCHES ${selectedDigit}`}
-                  <div className="text-[10px] font-normal opacity-90">Payout $19.00</div>
-                </button>
-              </div>
+              <button
+                onClick={() => executeTrade('DIGIT')}
+                disabled={isTrading}
+                className="w-full py-4 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition disabled:opacity-50"
+              >
+                {isTrading ? '...' : `MATCHES ${selectedDigit}`}
+                <div className="text-[10px] font-normal opacity-90">Payout ${(stake * 1.9).toFixed(2)}</div>
+              </button>
             </>
           )}
 
