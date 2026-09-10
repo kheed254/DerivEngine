@@ -39,6 +39,41 @@ export default function HomePage() {
 
   const isDark = theme === 'dark'
 
+  // ─── Payout calculation based on barrier digit ───
+  const getOverMultiplier = (digit: number) => {
+    const map: { [key: number]: number } = {
+      0: 1.11, 1: 1.25, 2: 1.43, 3: 1.67,
+      4: 2.00, 5: 2.50, 6: 3.33, 7: 5.00, 8: 10.00,
+    }
+    return map[digit] ?? 2.00
+  }
+  const getUnderMultiplier = (digit: number) => {
+    const map: { [key: number]: number } = {
+      1: 10.00, 2: 5.00, 3: 3.33, 4: 2.50,
+      5: 2.00, 6: 1.67, 7: 1.43, 8: 1.25, 9: 1.11,
+    }
+    return map[digit] ?? 2.00
+  }
+  const getOverPercent = (digit: number) => {
+    const map: { [key: number]: number } = {
+      0: 11, 1: 25, 2: 43, 3: 67, 4: 100,
+      5: 150, 6: 233, 7: 400, 8: 900,
+    }
+    return map[digit] ?? 100
+  }
+  const getUnderPercent = (digit: number) => {
+    const map: { [key: number]: number } = {
+      1: 900, 2: 400, 3: 233, 4: 150,
+      5: 100, 6: 67, 7: 43, 8: 25, 9: 11,
+    }
+    return map[digit] ?? 100
+  }
+
+  const overMultiplier = getOverMultiplier(selectedDigit)
+  const underMultiplier = getUnderMultiplier(selectedDigit)
+  const overPercent = getOverPercent(selectedDigit)
+  const underPercent = getUnderPercent(selectedDigit)
+
   // Auth
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -249,14 +284,14 @@ export default function HomePage() {
 
     try {
       const result = Math.random() > 0.5 ? 'WIN' : 'LOSS'
-      const payoutRate =
-        prediction === 'OVER' ? 2.38 :
-        prediction === 'UNDER' ? 1.9 :
-        prediction === 'MATCHES' ? 9 :
-        prediction === 'DIFFERS' ? 1.09 :
-        prediction === 'EVEN' || prediction === 'ODD' ? 1.95 :
-        prediction === 'UP' || prediction === 'DOWN' ? 2.0 :
-        1.9
+      let payoutRate = 1.9
+      if (prediction === 'OVER') payoutRate = overMultiplier
+      else if (prediction === 'UNDER') payoutRate = underMultiplier
+      else if (prediction === 'MATCHES') payoutRate = 9
+      else if (prediction === 'DIFFERS') payoutRate = 1.09
+      else if (prediction === 'EVEN' || prediction === 'ODD') payoutRate = 1.95
+      else if (prediction === 'UP' || prediction === 'DOWN') payoutRate = 2.0
+
       const payout = result === 'WIN' ? stake * payoutRate : 0
 
       const contract = {
@@ -381,7 +416,6 @@ export default function HomePage() {
   // ═══════════════════════════════════════════════
   return (
     <main className={`min-h-screen ${isDark ? 'bg-[#0a0613] text-white' : 'bg-gray-50 text-gray-900'}`}>
-      {/* Top Nav */}
       <nav className={`border-b ${isDark ? 'border-purple-500/20 bg-[#0d0818]' : 'border-gray-200 bg-white'}`}>
         <div className="px-6 py-3 flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-6">
@@ -429,9 +463,7 @@ export default function HomePage() {
         </div>
       </nav>
 
-      {/* Main */}
       <div className="px-4 py-4 grid grid-cols-1 lg:grid-cols-12 gap-4 max-w-[1600px] mx-auto">
-
         {/* LEFT: Positions */}
         <div className={`lg:col-span-2 rounded-2xl border p-4 ${isDark ? 'bg-[#0d0818] border-purple-500/20' : 'bg-white border-gray-200'}`}>
           <div className="flex gap-2 mb-4">
@@ -568,7 +600,7 @@ export default function HomePage() {
             ))}
           </div>
 
-          {/* ═══════ RISE/FALL ═══════ */}
+          {/* RISE/FALL */}
           {tradeType === 'rise-fall' && (
             <>
               <div className="mb-3">
@@ -611,7 +643,7 @@ export default function HomePage() {
             </>
           )}
 
-          {/* ═══════ DIGITS ═══════ */}
+          {/* DIGITS */}
           {tradeType === 'digits' && (
             <>
               <div className="grid grid-cols-3 gap-1.5 mb-3">
@@ -643,17 +675,17 @@ export default function HomePage() {
                     className={`py-3 text-white rounded-xl transition disabled:opacity-50 ${digitSide === 'OVER' ? 'bg-emerald-500 ring-2 ring-emerald-400' : 'bg-emerald-600 hover:bg-emerald-500'}`}>
                     <div className="flex items-center justify-between px-2">
                       <span className="font-bold text-xs">OVER {selectedDigit}</span>
-                      <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+138%</span>
+                      <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+{overPercent}%</span>
                     </div>
-                    <div className="text-[10px] opacity-90 mt-0.5 px-2 text-left">Payout ${(stake * 2.38).toFixed(2)}</div>
+                    <div className="text-[10px] opacity-90 mt-0.5 px-2 text-left">Payout ${(stake * overMultiplier).toFixed(2)}</div>
                   </button>
                   <button onClick={() => { setDigitSide('UNDER'); executeTrade('UNDER') }} disabled={isTrading}
                     className={`py-3 text-white rounded-xl transition disabled:opacity-50 ${digitSide === 'UNDER' ? 'bg-red-500 ring-2 ring-red-400' : 'bg-red-600 hover:bg-red-500'}`}>
                     <div className="flex items-center justify-between px-2">
                       <span className="font-bold text-xs">UNDER {selectedDigit}</span>
-                      <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+90%</span>
+                      <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+{underPercent}%</span>
                     </div>
-                    <div className="text-[10px] opacity-90 mt-0.5 px-2 text-left">Payout ${(stake * 1.9).toFixed(2)}</div>
+                    <div className="text-[10px] opacity-90 mt-0.5 px-2 text-left">Payout ${(stake * underMultiplier).toFixed(2)}</div>
                   </button>
                 </div>
               )}
@@ -702,7 +734,7 @@ export default function HomePage() {
             </>
           )}
 
-          {/* ═══════ MULTIPLIERS ═══════ */}
+          {/* MULTIPLIERS */}
           {tradeType === 'multipliers' && (
             <>
               <div className="mb-3">
