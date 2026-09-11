@@ -101,6 +101,7 @@ export default function HomePage() {
     if (!isLoggedIn || !user?.id) return
 
     const loadTrades = async () => {
+      console.log('🔄 Loading trades for user:', user.id)
       try {
         const { data, error } = await supabase
           .from('trades')
@@ -110,9 +111,11 @@ export default function HomePage() {
           .limit(50)
 
         if (error) {
-          console.error('❌ Failed to load trades:', error)
+          console.error('❌ Load error:', error)
           return
         }
+
+        console.log('✅ Loaded', data?.length || 0, 'trades from Supabase')
 
         if (data && data.length > 0) {
           const loaded = data.map((t: any) => ({
@@ -126,10 +129,9 @@ export default function HomePage() {
             time: new Date(t.created_at).toLocaleTimeString(),
           }))
           setClosedPositions(loaded)
-          console.log('✅ Loaded', data.length, 'trades from Supabase')
         }
       } catch (err) {
-        console.error('❌ Error loading trades:', err)
+        console.error('❌ Exception loading trades:', err)
       }
     }
 
@@ -169,7 +171,7 @@ export default function HomePage() {
           setLastDigit(d)
           recordDigit(d)
         })
-        await derivClient.subscribeToTicks('1HZ100V')
+        await derivClient.subscribeToTicks('R_100')
         setIsDerivConnected(true)
       } catch (error) { setIsDerivConnected(false) }
       fallbackInterval = setInterval(() => {
@@ -304,18 +306,29 @@ export default function HomePage() {
       // Save trade to Supabase
       try {
         const { data: { session } } = await supabase.auth.getSession()
-        if (session?.user?.id) {
-          await supabase.from('trades').insert({
-            user_id: session.user.id,
-            market: selectedMarket,
-            trade_type: tradeType,
-            prediction: prediction,
-            stake: stake,
-            entry_price: price,
-            result: result,
-            payout: result === 'WIN' ? payout : -stake,
-          })
-          console.log('✅ Trade saved to Supabase')
+        if (!session?.user?.id) {
+          console.error('❌ No session/user id when saving trade')
+        } else {
+          const { data: insertData, error: insertError } = await supabase
+            .from('trades')
+            .insert({
+              user_id: session.user.id,
+              market: selectedMarket,
+              trade_type: tradeType,
+              prediction: prediction,
+              stake: stake,
+              entry_price: price,
+              result: result,
+              payout: result === 'WIN' ? payout : -stake,
+            })
+            .select()
+
+          if (insertError) {
+            console.error('❌ Supabase insert error:', insertError)
+            setTradeResult(`⚠️ Save failed: ${insertError.message}`)
+          } else {
+            console.log('✅ Trade saved:', insertData)
+          }
         }
       } catch (err) {
         console.error('❌ Failed to save trade:', err)
