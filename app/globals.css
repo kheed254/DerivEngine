@@ -1,22 +1,19 @@
-@import "tailwindcss";
-
-@layer base {
-  body {
-    background-color: #0A0A0F;
-    color: white;
-    -webkit-font-smoothing: antialiased;
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-::-webkit-scrollbar {
-  width: 4px;
-}
-
-::-webkit-scrollbar-track {
-  background: #14141C;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #10B981;
-  border-radius: 10px;
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
 }

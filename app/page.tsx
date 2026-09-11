@@ -13,6 +13,7 @@ export default function HomePage() {
   const [user, setUser] = useState<any>(null)
   const [isDerivConnected, setIsDerivConnected] = useState(false)
   const [balance, setBalance] = useState(10000)
+  const [balancePulse, setBalancePulse] = useState(false)
   const [isLiveMode, setIsLiveMode] = useState(false)
   const [stake, setStake] = useState(0)
   const [duration, setDuration] = useState(60)
@@ -30,8 +31,8 @@ export default function HomePage() {
   const [digitSide, setDigitSide] = useState<string>('OVER')
   const [showDashboard, setShowDashboard] = useState(false)
 
-  // ─── Live digit tracking ───
-  const digitHistoryRef = useRef<number[]>([])     // rolling window of last N digits
+  // Live digit tracking
+  const digitHistoryRef = useRef<number[]>([])
   const [digitPercentages, setDigitPercentages] = useState<number[]>(Array(10).fill(10))
   const MAX_HISTORY = 100
 
@@ -71,13 +72,11 @@ export default function HomePage() {
   const overPercent = getOverPercent(selectedDigit)
   const underPercent = getUnderPercent(selectedDigit)
 
-  // ─── Record a digit into rolling history + recompute percentages ───
   const recordDigit = (d: number) => {
     const arr = digitHistoryRef.current
     arr.push(d)
     if (arr.length > MAX_HISTORY) arr.shift()
     digitHistoryRef.current = arr
-
     const counts = Array(10).fill(0)
     arr.forEach((x) => { counts[x]++ })
     const total = arr.length || 1
@@ -251,8 +250,15 @@ export default function HomePage() {
         payout: result === 'WIN' ? payout : -stake,
         time: new Date().toLocaleTimeString(),
       }
-      if (result === 'WIN') { setBalance((prev) => prev + payout); setTradeResult(`🎉 You won! +$${payout.toFixed(2)}`) }
-      else { setBalance((prev) => prev - stake); setTradeResult(`😢 You lost. -$${stake.toFixed(2)}`) }
+      if (result === 'WIN') {
+        setBalance((prev) => prev + payout)
+        setTradeResult(`🎉 You won! +$${payout.toFixed(2)}`)
+      } else {
+        setBalance((prev) => prev - stake)
+        setTradeResult(`😢 You lost. -$${stake.toFixed(2)}`)
+      }
+      setBalancePulse(true)
+      setTimeout(() => setBalancePulse(false), 800)
       setOpenPositions((prev) => [contract, ...prev])
       setTimeout(() => {
         setOpenPositions((prev) => prev.filter((c) => c.id !== contract.id))
@@ -397,7 +403,9 @@ export default function HomePage() {
             </div>
             <button onClick={() => setIsLiveMode(!isLiveMode)} className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs ${isDark ? 'bg-white/5' : 'bg-gray-100'}`}>
               <span className="text-purple-400 font-bold">$</span>
-              <span>{balance.toFixed(2)}</span>
+              <span className={`transition-all duration-300 ${balancePulse ? 'scale-125 text-purple-400' : 'scale-100'}`}>
+                {balance.toFixed(2)}
+              </span>
               <ChevronDown className="w-3 h-3 text-gray-400" />
             </button>
             <button className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium flex items-center gap-2">
@@ -422,8 +430,24 @@ export default function HomePage() {
             </button>
           </div>
           <div className={`text-center py-12 text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-            {activeTab === 'open' && openPositions.length === 0 && 'No open positions yet.'}
-            {activeTab === 'closed' && closedPositions.length === 0 && 'No closed positions yet.'}
+            {activeTab === 'open' && openPositions.length === 0 && (
+              <div className="flex flex-col items-center gap-2">
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${isDark ? 'bg-white/5' : 'bg-gray-100'}`}>
+                  <span className="text-2xl">📊</span>
+                </div>
+                <span>No open positions yet.</span>
+                <span className={`text-[10px] ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>Place a trade to get started</span>
+              </div>
+            )}
+            {activeTab === 'closed' && closedPositions.length === 0 && (
+              <div className="flex flex-col items-center gap-2">
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${isDark ? 'bg-white/5' : 'bg-gray-100'}`}>
+                  <span className="text-2xl">🕐</span>
+                </div>
+                <span>No closed positions yet.</span>
+                <span className={`text-[10px] ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>Your history will appear here</span>
+              </div>
+            )}
             {activeTab === 'open' && openPositions.map((pos) => (
               <div key={pos.id} className={`mb-2 p-2 rounded-lg text-left ${isDark ? 'bg-[#150d24]' : 'bg-gray-50'}`}>
                 <div className="flex justify-between text-xs">
@@ -465,7 +489,9 @@ export default function HomePage() {
             <div className="flex items-center gap-4">
               <div className="text-right">
                 <div className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>LAST DIGIT</div>
-                <div className="text-purple-400 text-2xl font-bold">{lastDigit}</div>
+                <div key={lastDigit} className="text-purple-400 text-2xl font-bold animate-[pulse_0.5s_ease-in-out]">
+                  {lastDigit}
+                </div>
               </div>
               <div className="text-right">
                 <div className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>PRICE</div>
@@ -479,7 +505,7 @@ export default function HomePage() {
           </div>
           <div ref={chartRef} className="w-full rounded-lg overflow-hidden" style={{ height: '400px', minHeight: '400px' }} />
 
-          {/* Live Last Digits — with LIVE frequency percentages */}
+          {/* Live Last Digits */}
           <div className="mt-4">
             <div className="flex justify-between items-center mb-4">
               <div className={`text-xs font-medium ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
@@ -499,7 +525,7 @@ export default function HomePage() {
                 const isSelected = selectedDigit === digit
                 return (
                   <button key={digit} onClick={() => setSelectedDigit(digit)}
-                    className="flex flex-col items-center gap-1.5">
+                    className="flex flex-col items-center gap-1.5 transition-transform hover:scale-105">
                     <div className="relative w-12 h-12 flex items-center justify-center">
                       <svg className="absolute inset-0 -rotate-90" width="48" height="48">
                         <circle cx="24" cy="24" r="22" fill="none"
@@ -523,7 +549,7 @@ export default function HomePage() {
                         </span>
                       </div>
                       {isLast && (
-                        <div className="absolute -top-2 left-1/2 -translate-x-1/2 text-purple-400 text-xs">▾</div>
+                        <div className="absolute -top-2 left-1/2 -translate-x-1/2 text-purple-400 text-xs animate-bounce">▾</div>
                       )}
                     </div>
                     <span className={`text-[10px] font-medium ${isLast ? 'text-purple-400' : isDark ? 'text-gray-500' : 'text-gray-400'}`}>
@@ -540,31 +566,31 @@ export default function HomePage() {
         <div className={`lg:col-span-3 rounded-2xl border p-4 ${isDark ? 'bg-[#0d0818] border-purple-500/20' : 'bg-white border-gray-200'}`}>
           <div className="flex gap-2 mb-3">
             <button onClick={() => setTradeMode('manual')}
-              className={`flex-1 py-2 rounded-lg text-sm font-medium ${tradeMode === 'manual' ? 'bg-purple-600 text-white' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+              className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${tradeMode === 'manual' ? 'bg-purple-600 text-white' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>
               Manual
             </button>
             <button onClick={() => setTradeMode('auto')}
-              className={`flex-1 py-2 rounded-lg text-sm font-medium ${tradeMode === 'auto' ? 'bg-purple-600 text-white' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+              className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${tradeMode === 'auto' ? 'bg-purple-600 text-white' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>
               Auto
             </button>
             <button onClick={() => setTradeMode('ai')}
-              className={`flex-1 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-1 ${tradeMode === 'ai' ? 'bg-purple-600 text-white' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+              className={`flex-1 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-1 transition ${tradeMode === 'ai' ? 'bg-purple-600 text-white' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>
               ✨ AI
             </button>
           </div>
 
           <div className="flex gap-2 mb-3">
-            <button onClick={() => setTradeType('rise-fall')} className={`flex-1 py-2 rounded-lg text-xs font-medium ${tradeType === 'rise-fall' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Rise/Fall</button>
-            <button onClick={() => setTradeType('digits')} className={`flex-1 py-2 rounded-lg text-xs font-medium ${tradeType === 'digits' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Digits</button>
+            <button onClick={() => setTradeType('rise-fall')} className={`flex-1 py-2 rounded-lg text-xs font-medium transition ${tradeType === 'rise-fall' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Rise/Fall</button>
+            <button onClick={() => setTradeType('digits')} className={`flex-1 py-2 rounded-lg text-xs font-medium transition ${tradeType === 'digits' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Digits</button>
             {tradeMode !== 'auto' && (
-              <button onClick={() => setTradeType('multipliers')} className={`flex-1 py-2 rounded-lg text-xs font-medium ${tradeType === 'multipliers' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Multipliers</button>
+              <button onClick={() => setTradeType('multipliers')} className={`flex-1 py-2 rounded-lg text-xs font-medium transition ${tradeType === 'multipliers' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Multipliers</button>
             )}
           </div>
 
           <div className="flex justify-between items-center mb-2">
             <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Stake (USD)</span>
             <div className="flex items-center gap-2">
-              <button onClick={resetDemo} className="text-[10px] px-2 py-0.5 border border-yellow-500/50 text-yellow-400 rounded">Reset demo</button>
+              <button onClick={resetDemo} className="text-[10px] px-2 py-0.5 border border-yellow-500/50 text-yellow-400 rounded hover:bg-yellow-500/10 transition">Reset demo</button>
               <div className={`flex items-center gap-1 text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                 <span>💵</span>
                 <span>${balance.toFixed(2)}</span>
@@ -573,16 +599,16 @@ export default function HomePage() {
           </div>
 
           <div className="flex items-center gap-2 mb-3">
-            <button onClick={() => setStake(Math.max(0, stake - 1))} className={`w-10 h-12 rounded-lg text-xl font-bold ${isDark ? 'bg-[#150d24] text-white' : 'bg-gray-100 text-gray-900'}`}>−</button>
+            <button onClick={() => setStake(Math.max(0, stake - 1))} className={`w-10 h-12 rounded-lg text-xl font-bold transition hover:scale-105 ${isDark ? 'bg-[#150d24] text-white' : 'bg-gray-100 text-gray-900'}`}>−</button>
             <input type="number" value={stake} onChange={(e) => setStake(Math.max(0, Number(e.target.value)))} min={0}
-              className={`flex-1 text-center text-xl font-bold rounded-lg py-3 outline-none border ${isDark ? 'bg-[#150d24] text-white border-purple-500/20' : 'bg-gray-50 text-gray-900 border-gray-200'}`} />
-            <button onClick={() => setStake(stake + 1)} className={`w-10 h-12 rounded-lg text-xl font-bold ${isDark ? 'bg-[#150d24] text-white' : 'bg-gray-100 text-gray-900'}`}>+</button>
+              className={`flex-1 text-center text-xl font-bold rounded-lg py-3 outline-none border transition ${isDark ? 'bg-[#150d24] text-white border-purple-500/20 focus:border-purple-500/50' : 'bg-gray-50 text-gray-900 border-gray-200 focus:border-purple-400'}`} />
+            <button onClick={() => setStake(stake + 1)} className={`w-10 h-12 rounded-lg text-xl font-bold transition hover:scale-105 ${isDark ? 'bg-[#150d24] text-white' : 'bg-gray-100 text-gray-900'}`}>+</button>
           </div>
 
           <div className="grid grid-cols-6 gap-1.5 mb-4">
             {[1, 5, 10, 25, 50, 100].map((val) => (
               <button key={val} onClick={() => setStake(val)}
-                className={`py-2 rounded-lg text-xs font-medium ${stake === val ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                className={`py-2 rounded-lg text-xs font-medium transition hover:scale-105 ${stake === val ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/30' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
                 {val}
               </button>
             ))}
@@ -600,7 +626,7 @@ export default function HomePage() {
                     <div className="grid grid-cols-5 gap-1.5">
                       {[{ v: 15, l: '15s' }, { v: 30, l: '30s' }, { v: 60, l: '1m' }, { v: 120, l: '2m' }, { v: 300, l: '5m' }].map((d) => (
                         <button key={d.v} onClick={() => setDuration(d.v)}
-                          className={`py-2 rounded-lg text-xs font-medium ${duration === d.v ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                          className={`py-2 rounded-lg text-xs font-medium transition ${duration === d.v ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
                           {d.l}
                         </button>
                       ))}
@@ -610,11 +636,11 @@ export default function HomePage() {
                     <div className={`text-xs mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Bot trades</div>
                     <div className="grid grid-cols-2 gap-2">
                       <button onClick={() => setBotTrade('RISE')}
-                        className={`py-3 rounded-lg text-xs font-bold ${botTrade === 'RISE' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                        className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'RISE' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
                         RISE
                       </button>
                       <button onClick={() => setBotTrade('FALL')}
-                        className={`py-3 rounded-lg text-xs font-bold ${botTrade === 'FALL' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                        className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'FALL' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
                         FALL
                       </button>
                     </div>
@@ -626,15 +652,15 @@ export default function HomePage() {
                 <>
                   <div className="grid grid-cols-3 gap-1.5 mb-3">
                     <button onClick={() => setDigitMode('over-under')}
-                      className={`py-2 rounded-lg text-xs font-medium ${digitMode === 'over-under' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
+                      className={`py-2 rounded-lg text-xs font-medium transition ${digitMode === 'over-under' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
                       Over / Under
                     </button>
                     <button onClick={() => setDigitMode('even-odd')}
-                      className={`py-2 rounded-lg text-xs font-medium ${digitMode === 'even-odd' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
+                      className={`py-2 rounded-lg text-xs font-medium transition ${digitMode === 'even-odd' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
                       Even / Odd
                     </button>
                     <button onClick={() => setDigitMode('matches-differs')}
-                      className={`py-2 rounded-lg text-xs font-medium ${digitMode === 'matches-differs' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
+                      className={`py-2 rounded-lg text-xs font-medium transition ${digitMode === 'matches-differs' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
                       Matches / Differs
                     </button>
                   </div>
@@ -652,11 +678,11 @@ export default function HomePage() {
                     {digitMode === 'over-under' && (
                       <div className="grid grid-cols-2 gap-2">
                         <button onClick={() => setBotTrade('OVER')}
-                          className={`py-3 rounded-lg text-xs font-bold ${botTrade === 'OVER' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                          className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'OVER' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
                           OVER {selectedDigit}
                         </button>
                         <button onClick={() => setBotTrade('UNDER')}
-                          className={`py-3 rounded-lg text-xs font-bold ${botTrade === 'UNDER' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                          className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'UNDER' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
                           UNDER {selectedDigit}
                         </button>
                       </div>
@@ -664,11 +690,11 @@ export default function HomePage() {
                     {digitMode === 'even-odd' && (
                       <div className="grid grid-cols-2 gap-2">
                         <button onClick={() => setBotTrade('EVEN')}
-                          className={`py-3 rounded-lg text-xs font-bold ${botTrade === 'EVEN' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                          className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'EVEN' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
                           EVEN
                         </button>
                         <button onClick={() => setBotTrade('ODD')}
-                          className={`py-3 rounded-lg text-xs font-bold ${botTrade === 'ODD' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                          className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'ODD' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
                           ODD
                         </button>
                       </div>
@@ -676,11 +702,11 @@ export default function HomePage() {
                     {digitMode === 'matches-differs' && (
                       <div className="grid grid-cols-2 gap-2">
                         <button onClick={() => setBotTrade('MATCHES')}
-                          className={`py-3 rounded-lg text-xs font-bold ${botTrade === 'MATCHES' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                          className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'MATCHES' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
                           MATCHES {selectedDigit}
                         </button>
                         <button onClick={() => setBotTrade('DIFFERS')}
-                          className={`py-3 rounded-lg text-xs font-bold ${botTrade === 'DIFFERS' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                          className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'DIFFERS' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
                           DIFFERS {selectedDigit}
                         </button>
                       </div>
@@ -693,12 +719,12 @@ export default function HomePage() {
                 <div>
                   <div className={`text-xs mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Martingale x</div>
                   <input type="number" value={martingale} onChange={(e) => setMartingale(Number(e.target.value))}
-                    className={`w-full rounded-lg px-3 py-2 outline-none border text-sm ${isDark ? 'bg-[#150d24] text-white border-purple-500/20' : 'bg-gray-50 text-gray-900 border-gray-200'}`} />
+                    className={`w-full rounded-lg px-3 py-2 outline-none border text-sm transition ${isDark ? 'bg-[#150d24] text-white border-purple-500/20 focus:border-purple-500/50' : 'bg-gray-50 text-gray-900 border-gray-200 focus:border-purple-400'}`} />
                 </div>
                 <div>
                   <div className={`text-xs mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Max runs</div>
                   <input type="number" value={maxRuns} onChange={(e) => setMaxRuns(Number(e.target.value))}
-                    className={`w-full rounded-lg px-3 py-2 outline-none border text-sm ${isDark ? 'bg-[#150d24] text-white border-purple-500/20' : 'bg-gray-50 text-gray-900 border-gray-200'}`} />
+                    className={`w-full rounded-lg px-3 py-2 outline-none border text-sm transition ${isDark ? 'bg-[#150d24] text-white border-purple-500/20 focus:border-purple-500/50' : 'bg-gray-50 text-gray-900 border-gray-200 focus:border-purple-400'}`} />
                 </div>
               </div>
 
@@ -708,19 +734,19 @@ export default function HomePage() {
                     <span className="text-emerald-400">◉</span> Target profit ($)
                   </div>
                   <input type="number" value={targetProfit} onChange={(e) => setTargetProfit(Number(e.target.value))}
-                    className={`w-full rounded-lg px-3 py-2 outline-none border text-sm ${isDark ? 'bg-[#150d24] text-white border-purple-500/20' : 'bg-gray-50 text-gray-900 border-gray-200'}`} />
+                    className={`w-full rounded-lg px-3 py-2 outline-none border text-sm transition ${isDark ? 'bg-[#150d24] text-white border-purple-500/20 focus:border-purple-500/50' : 'bg-gray-50 text-gray-900 border-gray-200 focus:border-purple-400'}`} />
                 </div>
                 <div>
                   <div className={`text-xs mb-1 flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                     <span className="text-red-400">◉</span> Stop loss ($)
                   </div>
                   <input type="number" value={stopLoss} onChange={(e) => setStopLoss(Number(e.target.value))}
-                    className={`w-full rounded-lg px-3 py-2 outline-none border text-sm ${isDark ? 'bg-[#150d24] text-white border-purple-500/20' : 'bg-gray-50 text-gray-900 border-gray-200'}`} />
+                    className={`w-full rounded-lg px-3 py-2 outline-none border text-sm transition ${isDark ? 'bg-[#150d24] text-white border-purple-500/20 focus:border-purple-500/50' : 'bg-gray-50 text-gray-900 border-gray-200 focus:border-purple-400'}`} />
                 </div>
               </div>
 
               <button onClick={() => setIsBotRunning(!isBotRunning)}
-                className="w-full py-3 bg-purple-500 hover:bg-purple-600 text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 mb-2">
+                className="w-full py-3 bg-purple-500 hover:bg-purple-600 text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 mb-2 hover:scale-[1.02] shadow-lg shadow-purple-500/30">
                 <Play className="w-4 h-4" /> {isBotRunning ? 'Stop bot' : 'Start bot'}
               </button>
 
@@ -742,7 +768,7 @@ export default function HomePage() {
                     <div className="grid grid-cols-5 gap-1.5">
                       {[{ v: 15, l: '15s' }, { v: 30, l: '30s' }, { v: 60, l: '1m' }, { v: 120, l: '2m' }, { v: 300, l: '5m' }].map((d) => (
                         <button key={d.v} onClick={() => setDuration(d.v)}
-                          className={`py-2 rounded-lg text-xs font-medium ${duration === d.v ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                          className={`py-2 rounded-lg text-xs font-medium transition ${duration === d.v ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
                           {d.l}
                         </button>
                       ))}
@@ -756,18 +782,32 @@ export default function HomePage() {
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <button onClick={() => executeTrade('RISE')} disabled={isTrading}
-                      className="py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition disabled:opacity-50">
-                      <div className="flex flex-col items-center">
-                        <span className="font-bold text-sm">↑ RISE</span>
-                        <span className="text-[10px] opacity-80">higher</span>
-                      </div>
+                      className="py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition disabled:opacity-50 hover:scale-[1.02] shadow-lg shadow-emerald-500/20">
+                      {isTrading ? (
+                        <div className="flex items-center justify-center gap-2">
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          <span className="font-bold text-sm">Placing...</span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center">
+                          <span className="font-bold text-sm">↑ RISE</span>
+                          <span className="text-[10px] opacity-80">higher</span>
+                        </div>
+                      )}
                     </button>
                     <button onClick={() => executeTrade('FALL')} disabled={isTrading}
-                      className="py-4 bg-red-600 hover:bg-red-500 text-white rounded-xl transition disabled:opacity-50">
-                      <div className="flex flex-col items-center">
-                        <span className="font-bold text-sm">↓ FALL</span>
-                        <span className="text-[10px] opacity-80">lower</span>
-                      </div>
+                      className="py-4 bg-red-600 hover:bg-red-500 text-white rounded-xl transition disabled:opacity-50 hover:scale-[1.02] shadow-lg shadow-red-500/20">
+                      {isTrading ? (
+                        <div className="flex items-center justify-center gap-2">
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          <span className="font-bold text-sm">Placing...</span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center">
+                          <span className="font-bold text-sm">↓ FALL</span>
+                          <span className="text-[10px] opacity-80">lower</span>
+                        </div>
+                      )}
                     </button>
                   </div>
                 </>
@@ -777,15 +817,15 @@ export default function HomePage() {
                 <>
                   <div className="grid grid-cols-3 gap-1.5 mb-3">
                     <button onClick={() => setDigitMode('over-under')}
-                      className={`py-2 rounded-lg text-xs font-medium ${digitMode === 'over-under' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
+                      className={`py-2 rounded-lg text-xs font-medium transition ${digitMode === 'over-under' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
                       Over / Under
                     </button>
                     <button onClick={() => setDigitMode('even-odd')}
-                      className={`py-2 rounded-lg text-xs font-medium ${digitMode === 'even-odd' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
+                      className={`py-2 rounded-lg text-xs font-medium transition ${digitMode === 'even-odd' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
                       Even / Odd
                     </button>
                     <button onClick={() => setDigitMode('matches-differs')}
-                      className={`py-2 rounded-lg text-xs font-medium ${digitMode === 'matches-differs' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
+                      className={`py-2 rounded-lg text-xs font-medium transition ${digitMode === 'matches-differs' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
                       Matches / Differs
                     </button>
                   </div>
@@ -801,7 +841,7 @@ export default function HomePage() {
                   {digitMode === 'over-under' && (
                     <div className="grid grid-cols-2 gap-2">
                       <button onClick={() => { setDigitSide('OVER'); executeTrade('OVER') }} disabled={isTrading}
-                        className={`py-3 text-white rounded-xl transition disabled:opacity-50 ${digitSide === 'OVER' ? 'bg-emerald-500 ring-2 ring-emerald-400' : 'bg-emerald-600 hover:bg-emerald-500'}`}>
+                        className={`py-3 text-white rounded-xl transition disabled:opacity-50 hover:scale-[1.02] ${digitSide === 'OVER' ? 'bg-emerald-500 ring-2 ring-emerald-400 shadow-lg shadow-emerald-500/30' : 'bg-emerald-600 hover:bg-emerald-500'}`}>
                         <div className="flex items-center justify-between px-2">
                           <span className="font-bold text-xs">OVER {selectedDigit}</span>
                           <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+{overPercent}%</span>
@@ -809,7 +849,7 @@ export default function HomePage() {
                         <div className="text-[10px] opacity-90 mt-0.5 px-2 text-left">Payout ${(stake * overMultiplier).toFixed(2)}</div>
                       </button>
                       <button onClick={() => { setDigitSide('UNDER'); executeTrade('UNDER') }} disabled={isTrading}
-                        className={`py-3 text-white rounded-xl transition disabled:opacity-50 ${digitSide === 'UNDER' ? 'bg-red-500 ring-2 ring-red-400' : 'bg-red-600 hover:bg-red-500'}`}>
+                        className={`py-3 text-white rounded-xl transition disabled:opacity-50 hover:scale-[1.02] ${digitSide === 'UNDER' ? 'bg-red-500 ring-2 ring-red-400 shadow-lg shadow-red-500/30' : 'bg-red-600 hover:bg-red-500'}`}>
                         <div className="flex items-center justify-between px-2">
                           <span className="font-bold text-xs">UNDER {selectedDigit}</span>
                           <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+{underPercent}%</span>
@@ -821,7 +861,7 @@ export default function HomePage() {
                   {digitMode === 'even-odd' && (
                     <div className="grid grid-cols-2 gap-2">
                       <button onClick={() => { setDigitSide('EVEN'); executeTrade('EVEN') }} disabled={isTrading}
-                        className={`py-3 text-white rounded-xl transition disabled:opacity-50 ${digitSide === 'EVEN' ? 'bg-emerald-500 ring-2 ring-emerald-400' : 'bg-emerald-600 hover:bg-emerald-500'}`}>
+                        className={`py-3 text-white rounded-xl transition disabled:opacity-50 hover:scale-[1.02] ${digitSide === 'EVEN' ? 'bg-emerald-500 ring-2 ring-emerald-400 shadow-lg shadow-emerald-500/30' : 'bg-emerald-600 hover:bg-emerald-500'}`}>
                         <div className="flex items-center justify-between px-2">
                           <span className="font-bold text-xs">EVEN</span>
                           <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+95%</span>
@@ -829,7 +869,7 @@ export default function HomePage() {
                         <div className="text-[10px] opacity-90 mt-0.5 px-2 text-left">Payout ${(stake * 1.95).toFixed(2)}</div>
                       </button>
                       <button onClick={() => { setDigitSide('ODD'); executeTrade('ODD') }} disabled={isTrading}
-                        className={`py-3 text-white rounded-xl transition disabled:opacity-50 ${digitSide === 'ODD' ? 'bg-red-500 ring-2 ring-red-400' : 'bg-red-600 hover:bg-red-500'}`}>
+                        className={`py-3 text-white rounded-xl transition disabled:opacity-50 hover:scale-[1.02] ${digitSide === 'ODD' ? 'bg-red-500 ring-2 ring-red-400 shadow-lg shadow-red-500/30' : 'bg-red-600 hover:bg-red-500'}`}>
                         <div className="flex items-center justify-between px-2">
                           <span className="font-bold text-xs">ODD</span>
                           <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+95%</span>
@@ -841,7 +881,7 @@ export default function HomePage() {
                   {digitMode === 'matches-differs' && (
                     <div className="grid grid-cols-2 gap-2">
                       <button onClick={() => { setDigitSide('MATCHES'); executeTrade('MATCHES') }} disabled={isTrading}
-                        className={`py-3 text-white rounded-xl transition disabled:opacity-50 ${digitSide === 'MATCHES' ? 'bg-emerald-500 ring-2 ring-emerald-400' : 'bg-emerald-600 hover:bg-emerald-500'}`}>
+                        className={`py-3 text-white rounded-xl transition disabled:opacity-50 hover:scale-[1.02] ${digitSide === 'MATCHES' ? 'bg-emerald-500 ring-2 ring-emerald-400 shadow-lg shadow-emerald-500/30' : 'bg-emerald-600 hover:bg-emerald-500'}`}>
                         <div className="flex items-center justify-between px-2">
                           <span className="font-bold text-xs">MATCHES {selectedDigit}</span>
                           <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+800%</span>
@@ -849,7 +889,7 @@ export default function HomePage() {
                         <div className="text-[10px] opacity-90 mt-0.5 px-2 text-left">Payout ${(stake * 9).toFixed(2)}</div>
                       </button>
                       <button onClick={() => { setDigitSide('DIFFERS'); executeTrade('DIFFERS') }} disabled={isTrading}
-                        className={`py-3 text-white rounded-xl transition disabled:opacity-50 ${digitSide === 'DIFFERS' ? 'bg-red-500 ring-2 ring-red-400' : 'bg-red-600 hover:bg-red-500'}`}>
+                        className={`py-3 text-white rounded-xl transition disabled:opacity-50 hover:scale-[1.02] ${digitSide === 'DIFFERS' ? 'bg-red-500 ring-2 ring-red-400 shadow-lg shadow-red-500/30' : 'bg-red-600 hover:bg-red-500'}`}>
                         <div className="flex items-center justify-between px-2">
                           <span className="font-bold text-xs">DIFFERS</span>
                           <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+9%</span>
@@ -870,7 +910,7 @@ export default function HomePage() {
                     <div className="grid grid-cols-4 gap-1.5">
                       {[100, 200, 400, 1000].map((m) => (
                         <button key={m} onClick={() => setMultiplier(m)}
-                          className={`py-2 rounded-lg text-xs font-medium ${multiplier === m ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                          className={`py-2 rounded-lg text-xs font-medium transition ${multiplier === m ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/30' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
                           x{m}
                         </button>
                       ))}
@@ -893,14 +933,14 @@ export default function HomePage() {
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <button onClick={() => executeTrade('UP')} disabled={isTrading}
-                      className="py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition disabled:opacity-50">
+                      className="py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition disabled:opacity-50 hover:scale-[1.02] shadow-lg shadow-emerald-500/20">
                       <div className="flex flex-col items-center">
                         <span className="font-bold text-sm">↑ UP</span>
                         <span className="text-[10px] opacity-80">higher</span>
                       </div>
                     </button>
                     <button onClick={() => executeTrade('DOWN')} disabled={isTrading}
-                      className="py-4 bg-red-600 hover:bg-red-500 text-white rounded-xl transition disabled:opacity-50">
+                      className="py-4 bg-red-600 hover:bg-red-500 text-white rounded-xl transition disabled:opacity-50 hover:scale-[1.02] shadow-lg shadow-red-500/20">
                       <div className="flex flex-col items-center">
                         <span className="font-bold text-sm">↓ DOWN</span>
                         <span className="text-[10px] opacity-80">lower</span>
@@ -913,7 +953,7 @@ export default function HomePage() {
           )}
 
           {tradeResult && (
-            <div className={`mt-3 p-3 rounded-lg text-center text-sm ${tradeResult.includes('won') ? 'bg-purple-500/20 text-purple-300' : 'bg-red-500/20 text-red-300'}`}>
+            <div className={`mt-3 p-3 rounded-lg text-center text-sm animate-[slideIn_0.3s_ease-out] ${tradeResult.includes('won') ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'bg-red-500/20 text-red-300 border border-red-500/30'}`}>
               {tradeResult}
             </div>
           )}
@@ -923,7 +963,7 @@ export default function HomePage() {
       {/* AI Entry Scanner Modal */}
       {tradeMode === 'ai' && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <div className="w-full max-w-md rounded-2xl border bg-white border-gray-200">
+          <div className="w-full max-w-md rounded-2xl border bg-white border-gray-200 animate-[slideIn_0.3s_ease-out]">
             <div className="flex items-start justify-between p-5 border-b border-gray-200">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">
@@ -934,7 +974,7 @@ export default function HomePage() {
                   <p className="text-xs text-gray-500">Deep-scans 10 markets for the best entry</p>
                 </div>
               </div>
-              <button onClick={() => setTradeMode('manual')} className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 hover:bg-gray-200">
+              <button onClick={() => setTradeMode('manual')} className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 hover:bg-gray-200 transition">
                 <X className="w-4 h-4 text-gray-600" />
               </button>
             </div>
@@ -943,7 +983,7 @@ export default function HomePage() {
               <div className="mb-4">
                 <label className="text-xs block mb-2 text-gray-600">Trade type</label>
                 <select value={aiTradeType} onChange={(e) => setAiTradeType(e.target.value)}
-                  className="w-full rounded-lg px-4 py-3 outline-none border text-sm font-medium bg-gray-50 text-gray-900 border-gray-200">
+                  className="w-full rounded-lg px-4 py-3 outline-none border text-sm font-medium bg-gray-50 text-gray-900 border-gray-200 transition focus:border-purple-400">
                   <option>Match / Differ</option>
                   <option>Over / Under</option>
                   <option>Even / Odd</option>
@@ -962,7 +1002,7 @@ export default function HomePage() {
                     <div className="flex flex-wrap justify-center gap-1">
                       {aiMarkets.map((m) => (
                         <span key={m}
-                          className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                          className={`text-[10px] px-2 py-0.5 rounded-full font-medium transition ${
                             aiScannedMarkets.includes(m)
                               ? 'bg-emerald-500/20 text-emerald-600 line-through'
                               : 'bg-purple-500/20 text-purple-600'
@@ -1028,11 +1068,11 @@ export default function HomePage() {
                     </div>
                   </div>
                   <button onClick={runDeepScan}
-                    className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 mb-3">
+                    className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 mb-3 hover:scale-[1.02]">
                     <Search className="w-4 h-4" /> Re-scan for Best Market
                   </button>
                   <button onClick={loadScannerBot}
-                    className="w-full py-3.5 rounded-xl font-bold text-sm bg-white text-purple-600 border border-purple-300 hover:bg-purple-50 transition">
+                    className="w-full py-3.5 rounded-xl font-bold text-sm bg-white text-purple-600 border border-purple-300 hover:bg-purple-50 transition hover:scale-[1.02]">
                     Load {aiBestMarket} Bot
                   </button>
                 </>
@@ -1048,7 +1088,7 @@ export default function HomePage() {
                     <div className="h-1.5 rounded-full overflow-hidden bg-gray-100" />
                   </div>
                   <button onClick={runDeepScan}
-                    className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 mb-3">
+                    className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 mb-3 hover:scale-[1.02]">
                     <Search className="w-4 h-4" /> Deep Scan for Best Market
                   </button>
                   <button disabled className="w-full py-3.5 rounded-xl font-bold text-sm bg-gray-100 text-gray-400 cursor-not-allowed">
