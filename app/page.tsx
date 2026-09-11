@@ -15,6 +15,7 @@ export default function HomePage() {
   const [balance, setBalance] = useState(10000)
   const [balancePulse, setBalancePulse] = useState(false)
   const [isLiveMode, setIsLiveMode] = useState(false)
+  const [isAccountDropdownOpen, setIsAccountDropdownOpen] = useState(false)
   const [stake, setStake] = useState(0)
   const [duration, setDuration] = useState(60)
   const [multiplier, setMultiplier] = useState(100)
@@ -439,13 +440,78 @@ export default function HomePage() {
               <span className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></span>
               <span className="text-purple-400 font-medium">{isLiveMode ? 'LIVE ACCOUNT' : 'DEMO ACCOUNT'}</span>
             </div>
-            <button onClick={() => setIsLiveMode(!isLiveMode)} className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs ${isDark ? 'bg-white/5' : 'bg-gray-100'}`}>
-              <span className="text-purple-400 font-bold">$</span>
-              <span className={`transition-all duration-300 ${balancePulse ? 'scale-125 text-purple-400' : 'scale-100'}`}>
-                {balance.toFixed(2)}
-              </span>
-              <ChevronDown className="w-3 h-3 text-gray-400" />
-            </button>
+
+            {/* Account Switcher */}
+            <div className="hidden md:block relative">
+              <button
+                onClick={() => setIsAccountDropdownOpen(!isAccountDropdownOpen)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition ${
+                  isLiveMode
+                    ? 'bg-yellow-500/10 border border-yellow-500/30'
+                    : isDark ? 'bg-white/5' : 'bg-gray-100'
+                }`}
+              >
+                <span className={`font-bold ${isLiveMode ? 'text-yellow-400' : 'text-purple-400'}`}>$</span>
+                <span className={`transition-all duration-300 ${balancePulse ? 'scale-125' : 'scale-100'} ${isLiveMode ? 'text-yellow-400' : (isDark ? 'text-white' : 'text-gray-900')}`}>
+                  {balance.toFixed(2)}
+                </span>
+                <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform ${isAccountDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {isAccountDropdownOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsAccountDropdownOpen(false)} />
+
+                  <div
+                    className={`absolute right-0 top-full mt-2 w-72 rounded-2xl border shadow-2xl z-50 overflow-hidden ${
+                      isDark ? 'bg-[#0d0818] border-purple-500/20' : 'bg-white border-gray-200'
+                    }`}
+                    style={{ boxShadow: '0 20px 50px rgba(0,0,0,0.3)' }}
+                  >
+                    <div className={`px-4 py-2 text-[10px] font-bold tracking-wider ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                      SWITCH ACCOUNT
+                    </div>
+
+                    {/* Real account */}
+                    <button
+                      onClick={() => { setIsLiveMode(true); setIsAccountDropdownOpen(false) }}
+                      className={`w-full flex items-start gap-3 px-4 py-3 transition ${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'}`}
+                    >
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${isLiveMode ? 'bg-purple-500/20' : (isDark ? 'bg-white/5' : 'bg-gray-100')}`}>
+                        {isLiveMode ? <span className="text-purple-400 text-sm">✓</span> : <span className="text-gray-400 text-sm">🔒</span>}
+                      </div>
+                      <div className="flex-1 text-left">
+                        <div className="flex items-center justify-between">
+                          <span className={`font-semibold text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>Real account</span>
+                          <span className={`font-bold text-sm ${isLiveMode ? 'text-yellow-400' : (isDark ? 'text-gray-400' : 'text-gray-600')}`}>$0.00</span>
+                        </div>
+                        <div className={`text-[11px] mt-0.5 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Your live funds</div>
+                      </div>
+                    </button>
+
+                    <div className={`h-px ${isDark ? 'bg-purple-500/10' : 'bg-gray-100'}`} />
+
+                    {/* Demo account */}
+                    <button
+                      onClick={() => { setIsLiveMode(false); setIsAccountDropdownOpen(false) }}
+                      className={`w-full flex items-start gap-3 px-4 py-3 transition ${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'}`}
+                    >
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${!isLiveMode ? 'bg-purple-500/20' : (isDark ? 'bg-white/5' : 'bg-gray-100')}`}>
+                        {!isLiveMode ? <span className="text-purple-400 text-sm">✓</span> : <span className="text-yellow-500 text-sm">⚠️</span>}
+                      </div>
+                      <div className="flex-1 text-left">
+                        <div className="flex items-center justify-between">
+                          <span className={`font-semibold text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>Demo account</span>
+                          <span className={`font-bold text-sm ${!isLiveMode ? 'text-yellow-400' : (isDark ? 'text-gray-400' : 'text-gray-600')}`}>${balance.toFixed(2)}</span>
+                        </div>
+                        <div className={`text-[11px] mt-0.5 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Practice · virtual funds</div>
+                      </div>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+
             <button className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium flex items-center gap-2">
               <span>↓</span> Deposit
             </button>
@@ -651,7 +717,6 @@ export default function HomePage() {
             ))}
           </div>
 
-          {/* AUTO */}
           {tradeMode === 'auto' && (
             <>
               {tradeType === 'rise-fall' && (
@@ -673,33 +738,22 @@ export default function HomePage() {
                     <div className={`text-xs mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Bot trades</div>
                     <div className="grid grid-cols-2 gap-2">
                       <button onClick={() => setBotTrade('RISE')}
-                        className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'RISE' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
-                        RISE
-                      </button>
+                        className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'RISE' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>RISE</button>
                       <button onClick={() => setBotTrade('FALL')}
-                        className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'FALL' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
-                        FALL
-                      </button>
+                        className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'FALL' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>FALL</button>
                     </div>
                   </div>
                 </>
               )}
-
               {tradeType === 'digits' && (
                 <>
                   <div className="grid grid-cols-3 gap-1.5 mb-3">
                     <button onClick={() => setDigitMode('over-under')}
-                      className={`py-2 rounded-lg text-xs font-medium transition ${digitMode === 'over-under' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
-                      Over / Under
-                    </button>
+                      className={`py-2 rounded-lg text-xs font-medium transition ${digitMode === 'over-under' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Over / Under</button>
                     <button onClick={() => setDigitMode('even-odd')}
-                      className={`py-2 rounded-lg text-xs font-medium transition ${digitMode === 'even-odd' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
-                      Even / Odd
-                    </button>
+                      className={`py-2 rounded-lg text-xs font-medium transition ${digitMode === 'even-odd' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Even / Odd</button>
                     <button onClick={() => setDigitMode('matches-differs')}
-                      className={`py-2 rounded-lg text-xs font-medium transition ${digitMode === 'matches-differs' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
-                      Matches / Differs
-                    </button>
+                      className={`py-2 rounded-lg text-xs font-medium transition ${digitMode === 'matches-differs' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Matches / Differs</button>
                   </div>
                   <div className={`flex items-center justify-between p-3 rounded-lg mb-3 ${isDark ? 'bg-[#150d24]' : 'bg-gray-50'}`}>
                     <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
@@ -715,37 +769,25 @@ export default function HomePage() {
                     {digitMode === 'over-under' && (
                       <div className="grid grid-cols-2 gap-2">
                         <button onClick={() => setBotTrade('OVER')}
-                          className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'OVER' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
-                          OVER {selectedDigit}
-                        </button>
+                          className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'OVER' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>OVER {selectedDigit}</button>
                         <button onClick={() => setBotTrade('UNDER')}
-                          className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'UNDER' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
-                          UNDER {selectedDigit}
-                        </button>
+                          className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'UNDER' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>UNDER {selectedDigit}</button>
                       </div>
                     )}
                     {digitMode === 'even-odd' && (
                       <div className="grid grid-cols-2 gap-2">
                         <button onClick={() => setBotTrade('EVEN')}
-                          className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'EVEN' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
-                          EVEN
-                        </button>
+                          className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'EVEN' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>EVEN</button>
                         <button onClick={() => setBotTrade('ODD')}
-                          className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'ODD' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
-                          ODD
-                        </button>
+                          className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'ODD' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>ODD</button>
                       </div>
                     )}
                     {digitMode === 'matches-differs' && (
                       <div className="grid grid-cols-2 gap-2">
                         <button onClick={() => setBotTrade('MATCHES')}
-                          className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'MATCHES' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
-                          MATCHES {selectedDigit}
-                        </button>
+                          className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'MATCHES' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>MATCHES {selectedDigit}</button>
                         <button onClick={() => setBotTrade('DIFFERS')}
-                          className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'DIFFERS' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
-                          DIFFERS {selectedDigit}
-                        </button>
+                          className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'DIFFERS' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>DIFFERS {selectedDigit}</button>
                       </div>
                     )}
                   </div>
@@ -793,7 +835,6 @@ export default function HomePage() {
             </>
           )}
 
-          {/* MANUAL */}
           {tradeMode === 'manual' && (
             <>
               {tradeType === 'rise-fall' && (
@@ -854,17 +895,11 @@ export default function HomePage() {
                 <>
                   <div className="grid grid-cols-3 gap-1.5 mb-3">
                     <button onClick={() => setDigitMode('over-under')}
-                      className={`py-2 rounded-lg text-xs font-medium transition ${digitMode === 'over-under' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
-                      Over / Under
-                    </button>
+                      className={`py-2 rounded-lg text-xs font-medium transition ${digitMode === 'over-under' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Over / Under</button>
                     <button onClick={() => setDigitMode('even-odd')}
-                      className={`py-2 rounded-lg text-xs font-medium transition ${digitMode === 'even-odd' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
-                      Even / Odd
-                    </button>
+                      className={`py-2 rounded-lg text-xs font-medium transition ${digitMode === 'even-odd' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Even / Odd</button>
                     <button onClick={() => setDigitMode('matches-differs')}
-                      className={`py-2 rounded-lg text-xs font-medium transition ${digitMode === 'matches-differs' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
-                      Matches / Differs
-                    </button>
+                      className={`py-2 rounded-lg text-xs font-medium transition ${digitMode === 'matches-differs' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Matches / Differs</button>
                   </div>
                   <div className={`flex items-center justify-between p-3 rounded-lg mb-3 ${isDark ? 'bg-[#150d24]' : 'bg-gray-50'}`}>
                     <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
@@ -941,15 +976,11 @@ export default function HomePage() {
               {tradeType === 'multipliers' && (
                 <>
                   <div className="mb-3">
-                    <div className={`text-xs mb-2 flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                      📈 Multiplier
-                    </div>
+                    <div className={`text-xs mb-2 flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>📈 Multiplier</div>
                     <div className="grid grid-cols-4 gap-1.5">
                       {[100, 200, 400, 1000].map((m) => (
                         <button key={m} onClick={() => setMultiplier(m)}
-                          className={`py-2 rounded-lg text-xs font-medium transition ${multiplier === m ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/30' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
-                          x{m}
-                        </button>
+                          className={`py-2 rounded-lg text-xs font-medium transition ${multiplier === m ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/30' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>x{m}</button>
                       ))}
                     </div>
                   </div>
@@ -961,10 +992,7 @@ export default function HomePage() {
                     <div className="flex justify-between text-xs">
                       <span className={isDark ? 'text-gray-400' : 'text-gray-600'}>Stop out at</span>
                       <span className="text-red-400 font-medium">
-                        {multiplier === 100 ? '1.00% move' :
-                         multiplier === 200 ? '0.50% move' :
-                         multiplier === 400 ? '0.25% move' :
-                         multiplier === 1000 ? '0.10% move' : '1.00% move'}
+                        {multiplier === 100 ? '1.00% move' : multiplier === 200 ? '0.50% move' : multiplier === 400 ? '0.25% move' : multiplier === 1000 ? '0.10% move' : '1.00% move'}
                       </span>
                     </div>
                   </div>
@@ -1043,9 +1071,7 @@ export default function HomePage() {
                             aiScannedMarkets.includes(m)
                               ? 'bg-emerald-500/20 text-emerald-600 line-through'
                               : 'bg-purple-500/20 text-purple-600'
-                          }`}>
-                          ✓ {m}
-                        </span>
+                          }`}>✓ {m}</span>
                       ))}
                     </div>
                   </div>
