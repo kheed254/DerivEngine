@@ -96,6 +96,46 @@ export default function HomePage() {
     return () => subscription.unsubscribe()
   }, [])
 
+  // Load trade history from Supabase
+  useEffect(() => {
+    if (!isLoggedIn || !user?.id) return
+
+    const loadTrades = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('trades')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(50)
+
+        if (error) {
+          console.error('❌ Failed to load trades:', error)
+          return
+        }
+
+        if (data && data.length > 0) {
+          const loaded = data.map((t: any) => ({
+            id: t.id,
+            market: t.market,
+            type: t.prediction,
+            stake: t.stake,
+            entryPrice: t.entry_price,
+            result: t.result,
+            payout: t.payout,
+            time: new Date(t.created_at).toLocaleTimeString(),
+          }))
+          setClosedPositions(loaded)
+          console.log('✅ Loaded', data.length, 'trades from Supabase')
+        }
+      } catch (err) {
+        console.error('❌ Error loading trades:', err)
+      }
+    }
+
+    loadTrades()
+  }, [isLoggedIn, user?.id])
+
   // Reset price on market change
   useEffect(() => {
     if (!showDashboard) return
@@ -260,6 +300,27 @@ export default function HomePage() {
       setBalancePulse(true)
       setTimeout(() => setBalancePulse(false), 800)
       setOpenPositions((prev) => [contract, ...prev])
+
+      // Save trade to Supabase
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.user?.id) {
+          await supabase.from('trades').insert({
+            user_id: session.user.id,
+            market: selectedMarket,
+            trade_type: tradeType,
+            prediction: prediction,
+            stake: stake,
+            entry_price: price,
+            result: result,
+            payout: result === 'WIN' ? payout : -stake,
+          })
+          console.log('✅ Trade saved to Supabase')
+        }
+      } catch (err) {
+        console.error('❌ Failed to save trade:', err)
+      }
+
       setTimeout(() => {
         setOpenPositions((prev) => prev.filter((c) => c.id !== contract.id))
         setClosedPositions((prev) => [contract, ...prev])
