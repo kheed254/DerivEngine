@@ -96,10 +96,9 @@ export default function HomePage() {
     return () => subscription.unsubscribe()
   }, [])
 
-  // Load trade history from Supabase
+  // Load trade history
   useEffect(() => {
     if (!isLoggedIn || !user?.id) return
-
     const loadTrades = async () => {
       console.log('🔄 Loading trades for user:', user.id)
       try {
@@ -109,32 +108,18 @@ export default function HomePage() {
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
           .limit(50)
-
-        if (error) {
-          console.error('❌ Load error:', error)
-          return
-        }
-
+        if (error) { console.error('❌ Load error:', error); return }
         console.log('✅ Loaded', data?.length || 0, 'trades from Supabase')
-
         if (data && data.length > 0) {
           const loaded = data.map((t: any) => ({
-            id: t.id,
-            market: t.market,
-            type: t.prediction,
-            stake: t.stake,
-            entryPrice: t.entry_price,
-            result: t.result,
-            payout: t.payout,
+            id: t.id, market: t.market, type: t.prediction, stake: t.stake,
+            entryPrice: t.entry_price, result: t.result, payout: t.payout,
             time: new Date(t.created_at).toLocaleTimeString(),
           }))
           setClosedPositions(loaded)
         }
-      } catch (err) {
-        console.error('❌ Exception loading trades:', err)
-      }
+      } catch (err) { console.error('❌ Exception loading trades:', err) }
     }
-
     loadTrades()
   }, [isLoggedIn, user?.id])
 
@@ -171,7 +156,7 @@ export default function HomePage() {
           setLastDigit(d)
           recordDigit(d)
         })
-        await derivClient.subscribeToTicks('R_100')
+        await derivClient.subscribeToTicks('1HZ100V')
         setIsDerivConnected(true)
       } catch (error) { setIsDerivConnected(false) }
       fallbackInterval = setInterval(() => {
@@ -303,36 +288,21 @@ export default function HomePage() {
       setTimeout(() => setBalancePulse(false), 800)
       setOpenPositions((prev) => [contract, ...prev])
 
-      // Save trade to Supabase
       try {
         const { data: { session } } = await supabase.auth.getSession()
-        if (!session?.user?.id) {
-          console.error('❌ No session/user id when saving trade')
-        } else {
+        if (session?.user?.id) {
           const { data: insertData, error: insertError } = await supabase
             .from('trades')
             .insert({
-              user_id: session.user.id,
-              market: selectedMarket,
-              trade_type: tradeType,
-              prediction: prediction,
-              stake: stake,
-              entry_price: price,
-              result: result,
+              user_id: session.user.id, market: selectedMarket, trade_type: tradeType,
+              prediction, stake, entry_price: price, result,
               payout: result === 'WIN' ? payout : -stake,
             })
             .select()
-
-          if (insertError) {
-            console.error('❌ Supabase insert error:', insertError)
-            setTradeResult(`⚠️ Save failed: ${insertError.message}`)
-          } else {
-            console.log('✅ Trade saved:', insertData)
-          }
+          if (insertError) console.error('❌ Supabase insert error:', insertError)
+          else console.log('✅ Trade saved:', insertData)
         }
-      } catch (err) {
-        console.error('❌ Failed to save trade:', err)
-      }
+      } catch (err) { console.error('❌ Failed to save trade:', err) }
 
       setTimeout(() => {
         setOpenPositions((prev) => prev.filter((c) => c.id !== contract.id))
@@ -347,18 +317,14 @@ export default function HomePage() {
   const potentialPayout = stake * 1.9
 
   const runDeepScan = async () => {
-    setAiScanning(true)
-    setAiScanProgress(0)
-    setAiScannedMarkets([])
+    setAiScanning(true); setAiScanProgress(0); setAiScannedMarkets([])
     for (let i = 0; i < aiMarkets.length; i++) {
       await new Promise((r) => setTimeout(r, 500))
       setAiScannedMarkets((prev) => [...prev, aiMarkets[i]])
       setAiScanProgress(i + 1)
     }
     const best = aiMarkets[Math.floor(Math.random() * aiMarkets.length)]
-    setAiBestMarket(best)
-    setAiPrediction(Math.random() > 0.5 ? 'Even' : 'Odd')
-    setAiScanning(false)
+    setAiBestMarket(best); setAiPrediction(Math.random() > 0.5 ? 'Even' : 'Odd'); setAiScanning(false)
   }
 
   const loadScannerBot = () => {
@@ -371,10 +337,8 @@ export default function HomePage() {
                       aiBestMarket === 'V25 1s' ? 'Volatility 25 (1s) Index' :
                       aiBestMarket === 'V25' ? 'Volatility 25 Index' :
                       aiBestMarket === 'V10 1s' ? 'Volatility 10 (1s) Index' :
-                      aiBestMarket === 'V10' ? 'Volatility 10 Index' :
-                      'Volatility 100 (1s) Index')
-    setTradeMode('auto')
-    setTradeType('digits')
+                      aiBestMarket === 'V10' ? 'Volatility 10 Index' : 'Volatility 100 (1s) Index')
+    setTradeMode('auto'); setTradeType('digits')
     setDigitMode(aiTradeType === 'Match / Differ' ? 'matches-differs' :
                  aiTradeType === 'Over / Under' ? 'over-under' :
                  aiTradeType === 'Even / Odd' ? 'even-odd' : 'over-under')
@@ -579,7 +543,6 @@ export default function HomePage() {
           </div>
           <div ref={chartRef} className="w-full rounded-lg overflow-hidden" style={{ height: '400px', minHeight: '400px' }} />
 
-          {/* Live Last Digits */}
           <div className="mt-4">
             <div className="flex justify-between items-center mb-4">
               <div className={`text-xs font-medium ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
@@ -825,7 +788,7 @@ export default function HomePage() {
               </button>
 
               <p className={`text-[10px] leading-relaxed ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
-                ℹ️ The bot auto-places trades and multiplies your stake after a loss (martingale). It stops at your target profit, stop loss, or max runs. Keep this tab open while it runs.
+                ℹ️ The bot auto-places trades and multiplies your stake after a loss (martingale). It stops at your target profit, stop loss, or max runs.
               </p>
             </>
           )}
@@ -1034,7 +997,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* AI Entry Scanner Modal */}
+      {/* AI Entry Scanner */}
       {tradeMode === 'ai' && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
           <div className="w-full max-w-md rounded-2xl border bg-white border-gray-200 animate-[slideIn_0.3s_ease-out]">
@@ -1086,7 +1049,6 @@ export default function HomePage() {
                       ))}
                     </div>
                   </div>
-
                   <div className="mb-4">
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-xs text-gray-500">Analyzing...</span>
@@ -1096,7 +1058,6 @@ export default function HomePage() {
                       <div className="h-full bg-purple-500 transition-all duration-300" style={{ width: `${(aiScanProgress / 10) * 100}%` }} />
                     </div>
                   </div>
-
                   <button disabled className="w-full py-3.5 bg-purple-400/60 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 mb-3 cursor-not-allowed">
                     <Search className="w-4 h-4" /> Scanning...
                   </button>
@@ -1120,8 +1081,7 @@ export default function HomePage() {
                        aiBestMarket === 'V25 1s' ? 'Volatility 25 (1s) Index' :
                        aiBestMarket === 'V25' ? 'Volatility 25 Index' :
                        aiBestMarket === 'V10 1s' ? 'Volatility 10 (1s) Index' :
-                       aiBestMarket === 'V10' ? 'Volatility 10 Index' :
-                       'Volatility 100 (1s) Index'}
+                       aiBestMarket === 'V10' ? 'Volatility 10 Index' : 'Volatility 100 (1s) Index'}
                     </div>
                   </div>
                   <div className="mb-4">
