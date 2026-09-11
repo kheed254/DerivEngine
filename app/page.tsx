@@ -26,11 +26,14 @@ export default function HomePage() {
   const [activeTab, setActiveTab] = useState<'open' | 'closed'>('open')
   const [tradeType, setTradeType] = useState<'rise-fall' | 'digits' | 'multipliers'>('rise-fall')
   const [digitMode, setDigitMode] = useState<'over-under' | 'even-odd' | 'matches-differs'>('over-under')
-  const [selectedDigit, setSelectedDigit] = useState<number>(8)
+  const [selectedDigit, setSelectedDigit] = useState<number>(5)
   const [digitSide, setDigitSide] = useState<string>('OVER')
   const [showDashboard, setShowDashboard] = useState(false)
-  const [digitHistory] = useState<number[]>([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
-  const [digitPercentages] = useState<number[]>([4, 12, 10, 12, 20, 8, 8, 18, 0, 14])
+
+  // ─── Live digit tracking ───
+  const digitHistoryRef = useRef<number[]>([])     // rolling window of last N digits
+  const [digitPercentages, setDigitPercentages] = useState<number[]>(Array(10).fill(10))
+  const MAX_HISTORY = 100
 
   // Manual / Auto / AI
   const [tradeMode, setTradeMode] = useState<'manual' | 'auto' | 'ai'>('manual')
@@ -48,7 +51,7 @@ export default function HomePage() {
   const [aiScanProgress, setAiScanProgress] = useState(0)
   const [aiScanning, setAiScanning] = useState(false)
   const [aiScannedMarkets, setAiScannedMarkets] = useState<string[]>([])
-  const [aiBestMarket, setAiBestMarket] = useState<string>('Volatility 100 (1s) Index')
+  const [aiBestMarket, setAiBestMarket] = useState<string>('V100 1s')
   const [aiPrediction, setAiPrediction] = useState('Even')
 
   const chartRef = useRef<HTMLDivElement>(null)
@@ -57,7 +60,6 @@ export default function HomePage() {
   const priceHistoryRef = useRef<{ time: number; value: number }[]>([])
 
   const isDark = theme === 'dark'
-
   const aiMarkets = ['V10', 'V25', 'V50', 'V75', 'V100', 'V10 1s', 'V25 1s', 'V50 1s', 'V75 1s', 'V100 1s']
 
   const getOverMultiplier = (d: number) => ({ 0: 1.11, 1: 1.25, 2: 1.43, 3: 1.67, 4: 2.00, 5: 2.50, 6: 3.33, 7: 5.00, 8: 10.00 }[d] ?? 2.00)
@@ -68,6 +70,20 @@ export default function HomePage() {
   const underMultiplier = getUnderMultiplier(selectedDigit)
   const overPercent = getOverPercent(selectedDigit)
   const underPercent = getUnderPercent(selectedDigit)
+
+  // ─── Record a digit into rolling history + recompute percentages ───
+  const recordDigit = (d: number) => {
+    const arr = digitHistoryRef.current
+    arr.push(d)
+    if (arr.length > MAX_HISTORY) arr.shift()
+    digitHistoryRef.current = arr
+
+    const counts = Array(10).fill(0)
+    arr.forEach((x) => { counts[x]++ })
+    const total = arr.length || 1
+    const pcts = counts.map((c) => Math.round((c / total) * 100))
+    setDigitPercentages(pcts)
+  }
 
   // Auth
   useEffect(() => {
@@ -93,7 +109,10 @@ export default function HomePage() {
     }
     const base = basePrices[selectedMarket] || 730
     setPrice(base)
-    setLastDigit(Math.floor(base * 100) % 10)
+    const d = Math.floor(base * 100) % 10
+    setLastDigit(d)
+    digitHistoryRef.current = []
+    setDigitPercentages(Array(10).fill(10))
   }, [selectedMarket, showDashboard])
 
   // Deriv + simulation
@@ -107,7 +126,9 @@ export default function HomePage() {
         derivClient.setOnTick((newPrice: number) => {
           if (!isMounted) return
           setPrice(newPrice)
-          setLastDigit(Math.floor(newPrice * 100) % 10)
+          const d = Math.floor(newPrice * 100) % 10
+          setLastDigit(d)
+          recordDigit(d)
         })
         await derivClient.subscribeToTicks('1HZ100V')
         setIsDerivConnected(true)
@@ -116,7 +137,9 @@ export default function HomePage() {
         if (!isMounted) return
         setPrice((prev) => {
           const next = Math.max(100, prev + (Math.random() - 0.5) * 2)
-          setLastDigit(Math.floor(next * 100) % 10)
+          const d = Math.floor(next * 100) % 10
+          setLastDigit(d)
+          recordDigit(d)
           return next
         })
       }, 1000)
@@ -241,21 +264,17 @@ export default function HomePage() {
 
   const handleLogout = async () => { await supabase.auth.signOut(); setShowDashboard(false) }
   const resetDemo = () => { setBalance(10000); setTradeResult('Demo account reset to $10,000') }
-  const toggleTheme = () => setTheme(isDark ? 'dark' : 'dark') // placeholder
   const potentialPayout = stake * 1.9
 
   const runDeepScan = async () => {
     setAiScanning(true)
     setAiScanProgress(0)
     setAiScannedMarkets([])
-
     for (let i = 0; i < aiMarkets.length; i++) {
       await new Promise((r) => setTimeout(r, 500))
       setAiScannedMarkets((prev) => [...prev, aiMarkets[i]])
       setAiScanProgress(i + 1)
     }
-
-    // Pick a "best market" at random
     const best = aiMarkets[Math.floor(Math.random() * aiMarkets.length)]
     setAiBestMarket(best)
     setAiPrediction(Math.random() > 0.5 ? 'Even' : 'Odd')
@@ -279,8 +298,7 @@ export default function HomePage() {
     setDigitMode(aiTradeType === 'Match / Differ' ? 'matches-differs' :
                  aiTradeType === 'Over / Under' ? 'over-under' :
                  aiTradeType === 'Even / Odd' ? 'even-odd' : 'over-under')
-    setBotTrade(aiPrediction === 'Even' ? 'EVEN' :
-                aiPrediction === 'Odd' ? 'ODD' : 'OVER')
+    setBotTrade(aiPrediction === 'Even' ? 'EVEN' : aiPrediction === 'Odd' ? 'ODD' : 'OVER')
     setTradeResult(`✅ Loaded ${aiBestMarket} Bot with ${aiTradeType}`)
   }
 
@@ -460,27 +478,60 @@ export default function HomePage() {
             <div className={isDark ? 'text-gray-400' : 'text-gray-600'}>Low <span className="text-purple-400">{(price - 5).toFixed(2)}</span></div>
           </div>
           <div ref={chartRef} className="w-full rounded-lg overflow-hidden" style={{ height: '400px', minHeight: '400px' }} />
+
+          {/* Live Last Digits — with LIVE frequency percentages */}
           <div className="mt-4">
-            <div className="flex justify-between items-center mb-3">
+            <div className="flex justify-between items-center mb-4">
               <div className={`text-xs font-medium ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                 <span className="text-purple-400">#</span> LIVE LAST DIGITS
+                <span className={`ml-2 text-[10px] font-normal ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                  (last {digitHistoryRef.current.length || 0} ticks)
+                </span>
               </div>
               <div className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>tap a number to set your barrier</div>
             </div>
             <div className="grid grid-cols-10 gap-1">
-              {digitHistory.map((digit, i) => (
-                <button key={i} onClick={() => setSelectedDigit(digit)}
-                  className={`aspect-square rounded-full border-2 flex flex-col items-center justify-center text-sm font-bold transition ${
-                    selectedDigit === digit
-                      ? 'border-purple-500 bg-purple-500/20 text-purple-400'
-                      : isDark
-                      ? 'border-gray-700 bg-[#150d24] text-gray-300 hover:border-purple-500/50'
-                      : 'border-gray-300 bg-white text-gray-700 hover:border-purple-400'
-                  }`}>
-                  <span>{digit}</span>
-                  <span className="text-[8px] font-normal opacity-70">{digitPercentages[i]}%</span>
-                </button>
-              ))}
+              {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((digit) => {
+                const pct = digitPercentages[digit]
+                const circumference = 2 * Math.PI * 22
+                const offset = circumference - (Math.min(pct, 100) / 100) * circumference
+                const isLast = digit === lastDigit
+                const isSelected = selectedDigit === digit
+                return (
+                  <button key={digit} onClick={() => setSelectedDigit(digit)}
+                    className="flex flex-col items-center gap-1.5">
+                    <div className="relative w-12 h-12 flex items-center justify-center">
+                      <svg className="absolute inset-0 -rotate-90" width="48" height="48">
+                        <circle cx="24" cy="24" r="22" fill="none"
+                          stroke={isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'} strokeWidth="3" />
+                        <circle cx="24" cy="24" r="22" fill="none"
+                          stroke={isLast ? '#a855f7' : isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
+                          strokeWidth="3"
+                          strokeDasharray={circumference}
+                          strokeDashoffset={offset}
+                          strokeLinecap="round"
+                          className="transition-all duration-500"
+                        />
+                      </svg>
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
+                        isSelected
+                          ? isDark ? 'bg-purple-500/30 ring-2 ring-purple-400' : 'bg-purple-100 ring-2 ring-purple-400'
+                          : isDark ? 'bg-[#150d24]' : 'bg-white'
+                      }`}>
+                        <span className={`text-sm font-bold ${isLast ? 'text-purple-400' : isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                          {digit}
+                        </span>
+                      </div>
+                      {isLast && (
+                        <div className="absolute -top-2 left-1/2 -translate-x-1/2 text-purple-400 text-xs">▾</div>
+                      )}
+                    </div>
+                    <span className={`text-[10px] font-medium ${isLast ? 'text-purple-400' : isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                      {pct}%
+                    </span>
+                  </button>
+                )
+              })}
             </div>
           </div>
         </div>
@@ -872,8 +923,7 @@ export default function HomePage() {
       {/* AI Entry Scanner Modal */}
       {tradeMode === 'ai' && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <div className={`w-full max-w-md rounded-2xl border ${isDark ? 'bg-white border-gray-200' : 'bg-white border-gray-200'}`}>
-            {/* Header */}
+          <div className="w-full max-w-md rounded-2xl border bg-white border-gray-200">
             <div className="flex items-start justify-between p-5 border-b border-gray-200">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">
@@ -881,29 +931,19 @@ export default function HomePage() {
                 </div>
                 <div>
                   <h3 className="font-bold text-lg text-gray-900">Entry Scanner</h3>
-                  <p className="text-xs text-gray-500">
-                    Deep-scans 10 markets for the best entry
-                  </p>
+                  <p className="text-xs text-gray-500">Deep-scans 10 markets for the best entry</p>
                 </div>
               </div>
-              <button
-                onClick={() => setTradeMode('manual')}
-                className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 hover:bg-gray-200"
-              >
+              <button onClick={() => setTradeMode('manual')} className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 hover:bg-gray-200">
                 <X className="w-4 h-4 text-gray-600" />
               </button>
             </div>
 
-            {/* Body */}
             <div className="p-5">
-              {/* Trade type */}
               <div className="mb-4">
                 <label className="text-xs block mb-2 text-gray-600">Trade type</label>
-                <select
-                  value={aiTradeType}
-                  onChange={(e) => setAiTradeType(e.target.value)}
-                  className="w-full rounded-lg px-4 py-3 outline-none border text-sm font-medium bg-gray-50 text-gray-900 border-gray-200"
-                >
+                <select value={aiTradeType} onChange={(e) => setAiTradeType(e.target.value)}
+                  className="w-full rounded-lg px-4 py-3 outline-none border text-sm font-medium bg-gray-50 text-gray-900 border-gray-200">
                   <option>Match / Differ</option>
                   <option>Over / Under</option>
                   <option>Even / Odd</option>
@@ -911,7 +951,6 @@ export default function HomePage() {
                 </select>
               </div>
 
-              {/* Scanning State */}
               {aiScanning && (
                 <>
                   <div className="mb-4 p-5 rounded-2xl bg-purple-50 border border-purple-100 text-center">
@@ -940,31 +979,19 @@ export default function HomePage() {
                       <span className="text-xs font-medium text-gray-600">{aiScanProgress}/10</span>
                     </div>
                     <div className="h-1.5 rounded-full overflow-hidden bg-gray-100">
-                      <div
-                        className="h-full bg-purple-500 transition-all duration-300"
-                        style={{ width: `${(aiScanProgress / 10) * 100}%` }}
-                      />
+                      <div className="h-full bg-purple-500 transition-all duration-300" style={{ width: `${(aiScanProgress / 10) * 100}%` }} />
                     </div>
                   </div>
 
-                  <button
-                    disabled
-                    className="w-full py-3.5 bg-purple-400/60 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 mb-3 cursor-not-allowed"
-                  >
-                    <Search className="w-4 h-4" />
-                    Scanning...
+                  <button disabled className="w-full py-3.5 bg-purple-400/60 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 mb-3 cursor-not-allowed">
+                    <Search className="w-4 h-4" /> Scanning...
                   </button>
-
-                  <button
-                    disabled
-                    className="w-full py-3.5 rounded-xl font-bold text-sm bg-gray-100 text-gray-400 cursor-not-allowed"
-                  >
+                  <button disabled className="w-full py-3.5 rounded-xl font-bold text-sm bg-gray-100 text-gray-400 cursor-not-allowed">
                     Load Scanner Bot
                   </button>
                 </>
               )}
 
-              {/* Done State */}
               {!aiScanning && aiScanProgress === 10 && (
                 <>
                   <div className="mb-4">
@@ -983,21 +1010,14 @@ export default function HomePage() {
                        'Volatility 100 (1s) Index'}
                     </div>
                   </div>
-
                   <div className="mb-4">
                     <label className="text-xs block mb-2 text-gray-600">Trade type</label>
-                    <div className="w-full rounded-lg px-4 py-3 border text-sm font-medium bg-gray-50 text-gray-900 border-gray-200">
-                      {aiTradeType}
-                    </div>
+                    <div className="w-full rounded-lg px-4 py-3 border text-sm font-medium bg-gray-50 text-gray-900 border-gray-200">{aiTradeType}</div>
                   </div>
-
                   <div className="mb-4">
                     <label className="text-xs block mb-2 text-gray-600">Prediction (auto)</label>
-                    <div className="w-full rounded-lg px-4 py-3 border text-sm font-medium bg-gray-50 text-gray-900 border-gray-200">
-                      {aiPrediction}
-                    </div>
+                    <div className="w-full rounded-lg px-4 py-3 border text-sm font-medium bg-gray-50 text-gray-900 border-gray-200">{aiPrediction}</div>
                   </div>
-
                   <div className="mb-4">
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-xs text-gray-500">Scan complete</span>
@@ -1007,25 +1027,17 @@ export default function HomePage() {
                       <div className="h-full bg-purple-500 w-full" />
                     </div>
                   </div>
-
-                  <button
-                    onClick={runDeepScan}
-                    className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 mb-3"
-                  >
-                    <Search className="w-4 h-4" />
-                    Re-scan for Best Market
+                  <button onClick={runDeepScan}
+                    className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 mb-3">
+                    <Search className="w-4 h-4" /> Re-scan for Best Market
                   </button>
-
-                  <button
-                    onClick={loadScannerBot}
-                    className="w-full py-3.5 rounded-xl font-bold text-sm bg-white text-purple-600 border border-purple-300 hover:bg-purple-50 transition"
-                  >
+                  <button onClick={loadScannerBot}
+                    className="w-full py-3.5 rounded-xl font-bold text-sm bg-white text-purple-600 border border-purple-300 hover:bg-purple-50 transition">
                     Load {aiBestMarket} Bot
                   </button>
                 </>
               )}
 
-              {/* Initial State */}
               {!aiScanning && aiScanProgress === 0 && (
                 <>
                   <div className="mb-4">
@@ -1035,19 +1047,11 @@ export default function HomePage() {
                     </div>
                     <div className="h-1.5 rounded-full overflow-hidden bg-gray-100" />
                   </div>
-
-                  <button
-                    onClick={runDeepScan}
-                    className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 mb-3"
-                  >
-                    <Search className="w-4 h-4" />
-                    Deep Scan for Best Market
+                  <button onClick={runDeepScan}
+                    className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 mb-3">
+                    <Search className="w-4 h-4" /> Deep Scan for Best Market
                   </button>
-
-                  <button
-                    disabled
-                    className="w-full py-3.5 rounded-xl font-bold text-sm bg-gray-100 text-gray-400 cursor-not-allowed"
-                  >
+                  <button disabled className="w-full py-3.5 rounded-xl font-bold text-sm bg-gray-100 text-gray-400 cursor-not-allowed">
                     Load Scanner Bot
                   </button>
                 </>
