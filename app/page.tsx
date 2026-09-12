@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { DerivClient } from '@/lib/derivClient'
-import { ChevronDown, LogOut, Clock, Zap, Play, X, Search, Sparkles } from 'lucide-react'
+import { ChevronDown, LogOut, Clock, Zap, Play, X, Search, Sparkles, Copy, Check, Wallet, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react'
 
 export default function HomePage() {
   const [price, setPrice] = useState(730.69)
@@ -12,7 +12,9 @@ export default function HomePage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [isDerivConnected, setIsDerivConnected] = useState(false)
-  const [balance, setBalance] = useState(10000)
+  const [balance, setBalance] = useState(0)
+  const [demoBalance, setDemoBalance] = useState(10000)
+  const [liveBalance, setLiveBalance] = useState(0)
   const [balancePulse, setBalancePulse] = useState(false)
   const [isLiveMode, setIsLiveMode] = useState(false)
   const [isAccountDropdownOpen, setIsAccountDropdownOpen] = useState(false)
@@ -31,6 +33,20 @@ export default function HomePage() {
   const [selectedDigit, setSelectedDigit] = useState<number>(5)
   const [digitSide, setDigitSide] = useState<string>('OVER')
   const [showDashboard, setShowDashboard] = useState(false)
+
+  // Wallet modal
+  const [isWalletOpen, setIsWalletOpen] = useState(false)
+  const [walletTab, setWalletTab] = useState<'deposit' | 'withdraw'>('deposit')
+  const [paymentMethod, setPaymentMethod] = useState<'mpesa' | 'crypto'>('mpesa')
+  const [depositAmount, setDepositAmount] = useState('')
+  const [depositPhone, setDepositPhone] = useState('')
+  const [cryptoCoin, setCryptoCoin] = useState('USDT')
+  const [withdrawAmount, setWithdrawAmount] = useState('')
+  const [withdrawPhone, setWithdrawPhone] = useState('')
+  const [withdrawAddress, setWithdrawAddress] = useState('')
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [walletMessage, setWalletMessage] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
 
   // Live digit tracking
   const digitHistoryRef = useRef<number[]>([])
@@ -63,6 +79,15 @@ export default function HomePage() {
 
   const isDark = theme === 'dark'
   const aiMarkets = ['V10', 'V25', 'V50', 'V75', 'V100', 'V10 1s', 'V25 1s', 'V50 1s', 'V75 1s', 'V100 1s']
+
+  // ═══════════════════════════════════════════════════════
+  // CRYPTO DEPOSIT ADDRESSES (replace with your own!)
+  // ═══════════════════════════════════════════════════════
+  const CRYPTO_ADDRESSES: { [key: string]: string } = {
+    USDT: 'TQn9Y2khEsLJW1ChVWFMSMeRDow5KcbLSE', // TRC-20 USDT example
+    BTC: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
+    ETH: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0',
+  }
 
   const getOverMultiplier = (d: number) => ({ 0: 1.11, 1: 1.25, 2: 1.43, 3: 1.67, 4: 2.00, 5: 2.50, 6: 3.33, 7: 5.00, 8: 10.00 }[d] ?? 2.00)
   const getUnderMultiplier = (d: number) => ({ 1: 10.00, 2: 5.00, 3: 3.33, 4: 2.50, 5: 2.00, 6: 1.67, 7: 1.43, 8: 1.25, 9: 1.11 }[d] ?? 2.00)
@@ -97,11 +122,24 @@ export default function HomePage() {
     return () => subscription.unsubscribe()
   }, [])
 
+  // Load balances
+  useEffect(() => {
+    if (!isLoggedIn || !user?.id) return
+    const loadBalance = async () => {
+      const { data } = await supabase.from('balances').select('*').eq('user_id', user.id).single()
+      if (data) {
+        setDemoBalance(Number(data.demo_balance))
+        setLiveBalance(Number(data.live_balance))
+        setBalance(Number(isLiveMode ? data.live_balance : data.demo_balance))
+      }
+    }
+    loadBalance()
+  }, [isLoggedIn, user?.id, isLiveMode])
+
   // Load trade history
   useEffect(() => {
     if (!isLoggedIn || !user?.id) return
     const loadTrades = async () => {
-      console.log('🔄 Loading trades for user:', user.id)
       try {
         const { data, error } = await supabase
           .from('trades')
@@ -110,7 +148,6 @@ export default function HomePage() {
           .order('created_at', { ascending: false })
           .limit(50)
         if (error) { console.error('❌ Load error:', error); return }
-        console.log('✅ Loaded', data?.length || 0, 'trades from Supabase')
         if (data && data.length > 0) {
           const loaded = data.map((t: any) => ({
             id: t.id, market: t.market, type: t.prediction, stake: t.stake,
@@ -124,6 +161,11 @@ export default function HomePage() {
     loadTrades()
   }, [isLoggedIn, user?.id])
 
+  // Update balance when switching accounts
+  useEffect(() => {
+    setBalance(isLiveMode ? liveBalance : demoBalance)
+  }, [isLiveMode, liveBalance, demoBalance])
+
   // Reset price on market change
   useEffect(() => {
     if (!showDashboard) return
@@ -136,8 +178,7 @@ export default function HomePage() {
     }
     const base = basePrices[selectedMarket] || 730
     setPrice(base)
-    const d = Math.floor(base * 100) % 10
-    setLastDigit(d)
+    setLastDigit(Math.floor(base * 100) % 10)
     digitHistoryRef.current = []
     setDigitPercentages(Array(10).fill(10))
   }, [selectedMarket, showDashboard])
@@ -259,6 +300,128 @@ export default function HomePage() {
     return () => clearInterval(interval)
   }, [showDashboard, price, selectedMarket])
 
+  // ═══════════════════════════════════════════════════════
+  // DEPOSIT: M-Pesa
+  // ═══════════════════════════════════════════════════════
+  const handleMpesaDeposit = async () => {
+    setIsProcessing(true)
+    setWalletMessage(null)
+    try {
+      const amount = parseFloat(depositAmount)
+      if (!amount || amount <= 0) throw new Error('Enter a valid amount')
+      if (!depositPhone || depositPhone.length < 10) throw new Error('Enter a valid phone number')
+
+      // 1. Record deposit as pending in Supabase
+      const { data: depositRecord, error: depositErr } = await supabase
+        .from('deposits')
+        .insert({
+          user_id: user.id,
+          method: 'mpesa',
+          amount,
+          phone: depositPhone,
+          status: 'pending',
+        })
+        .select()
+        .single()
+
+      if (depositErr) throw depositErr
+
+      // 2. Call backend API route to initiate STK Push
+      const res = await fetch('/api/mpesa/stkpush', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: depositPhone,
+          amount,
+          depositId: depositRecord.id,
+        }),
+      })
+
+      const result = await res.json()
+
+      if (result.success) {
+        setWalletMessage(`✅ Check your phone (${depositPhone}) and enter your M-Pesa PIN to complete the deposit.`)
+      } else {
+        setWalletMessage(`❌ ${result.error || 'Failed to initiate M-Pesa payment'}`)
+        // Mark deposit as failed
+        await supabase.from('deposits').update({ status: 'failed' }).eq('id', depositRecord.id)
+      }
+    } catch (err: any) {
+      setWalletMessage(`❌ ${err.message}`)
+    }
+    setIsProcessing(false)
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // DEPOSIT: Crypto
+  // ═══════════════════════════════════════════════════════
+  const handleCryptoDeposit = async () => {
+    setIsProcessing(true)
+    setWalletMessage(null)
+    try {
+      const amount = parseFloat(depositAmount)
+      if (!amount || amount <= 0) throw new Error('Enter a valid amount')
+
+      // Record deposit as pending — user will send crypto manually
+      const { error: depositErr } = await supabase
+        .from('deposits')
+        .insert({
+          user_id: user.id,
+          method: 'crypto',
+          amount,
+          crypto_coin: cryptoCoin,
+          crypto_address: CRYPTO_ADDRESSES[cryptoCoin],
+          status: 'pending',
+        })
+
+      if (depositErr) throw depositErr
+
+      setWalletMessage(`✅ Send ${amount} USD worth of ${cryptoCoin} to the address shown. Your balance will be credited after confirmation.`)
+    } catch (err: any) {
+      setWalletMessage(`❌ ${err.message}`)
+    }
+    setIsProcessing(false)
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // WITHDRAWAL REQUEST
+  // ═══════════════════════════════════════════════════════
+  const handleWithdraw = async () => {
+    setIsProcessing(true)
+    setWalletMessage(null)
+    try {
+      const amount = parseFloat(withdrawAmount)
+      if (!amount || amount <= 0) throw new Error('Enter a valid amount')
+      if (amount > balance) throw new Error('Insufficient balance')
+      if (paymentMethod === 'mpesa' && (!withdrawPhone || withdrawPhone.length < 10)) {
+        throw new Error('Enter a valid phone number')
+      }
+      if (paymentMethod === 'crypto' && !withdrawAddress) {
+        throw new Error('Enter a valid crypto address')
+      }
+
+      const { error } = await supabase
+        .from('withdrawals')
+        .insert({
+          user_id: user.id,
+          method: paymentMethod,
+          amount,
+          phone: paymentMethod === 'mpesa' ? withdrawPhone : null,
+          crypto_address: paymentMethod === 'crypto' ? withdrawAddress : null,
+          status: 'pending',
+        })
+
+      if (error) throw error
+
+      setWalletMessage(`✅ Withdrawal request submitted. You will receive $${amount} after admin approval (typically within 24 hours).`)
+      setWithdrawAmount('')
+    } catch (err: any) {
+      setWalletMessage(`❌ ${err.message}`)
+    }
+    setIsProcessing(false)
+  }
+
+  // Execute trade (uses current account balance)
   const executeTrade = async (prediction: string) => {
     setIsTrading(true)
     setTradeResult(null)
@@ -278,32 +441,34 @@ export default function HomePage() {
         payout: result === 'WIN' ? payout : -stake,
         time: new Date().toLocaleTimeString(),
       }
-      if (result === 'WIN') {
-        setBalance((prev) => prev + payout)
-        setTradeResult(`🎉 You won! +$${payout.toFixed(2)}`)
+      const delta = result === 'WIN' ? payout : -stake
+
+      if (isLiveMode) {
+        const newLive = liveBalance + delta
+        if (newLive < 0) { setTradeResult('❌ Insufficient live balance'); setIsTrading(false); return }
+        setLiveBalance(newLive)
+        await supabase.from('balances').update({ live_balance: newLive, updated_at: new Date().toISOString() }).eq('user_id', user.id)
       } else {
-        setBalance((prev) => prev - stake)
-        setTradeResult(`😢 You lost. -$${stake.toFixed(2)}`)
+        const newDemo = demoBalance + delta
+        setDemoBalance(newDemo)
+        await supabase.from('balances').update({ demo_balance: newDemo, updated_at: new Date().toISOString() }).eq('user_id', user.id)
       }
+
+      if (result === 'WIN') setTradeResult(`🎉 You won! +$${payout.toFixed(2)}`)
+      else setTradeResult(`😢 You lost. -$${stake.toFixed(2)}`)
+
       setBalancePulse(true)
       setTimeout(() => setBalancePulse(false), 800)
       setOpenPositions((prev) => [contract, ...prev])
 
+      // Save trade
       try {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (session?.user?.id) {
-          const { data: insertData, error: insertError } = await supabase
-            .from('trades')
-            .insert({
-              user_id: session.user.id, market: selectedMarket, trade_type: tradeType,
-              prediction, stake, entry_price: price, result,
-              payout: result === 'WIN' ? payout : -stake,
-            })
-            .select()
-          if (insertError) console.error('❌ Supabase insert error:', insertError)
-          else console.log('✅ Trade saved:', insertData)
-        }
-      } catch (err) { console.error('❌ Failed to save trade:', err) }
+        await supabase.from('trades').insert({
+          user_id: user.id, market: selectedMarket, trade_type: tradeType,
+          prediction, stake, entry_price: price, result,
+          payout: result === 'WIN' ? payout : -stake,
+        })
+      } catch (err) {}
 
       setTimeout(() => {
         setOpenPositions((prev) => prev.filter((c) => c.id !== contract.id))
@@ -314,7 +479,11 @@ export default function HomePage() {
   }
 
   const handleLogout = async () => { await supabase.auth.signOut(); setShowDashboard(false) }
-  const resetDemo = () => { setBalance(10000); setTradeResult('Demo account reset to $10,000') }
+  const resetDemo = async () => {
+    setDemoBalance(10000)
+    if (user?.id) await supabase.from('balances').update({ demo_balance: 10000 }).eq('user_id', user.id)
+    setTradeResult('Demo account reset to $10,000')
+  }
   const potentialPayout = stake * 1.9
 
   const runDeepScan = async () => {
@@ -345,6 +514,12 @@ export default function HomePage() {
                  aiTradeType === 'Even / Odd' ? 'even-odd' : 'over-under')
     setBotTrade(aiPrediction === 'Even' ? 'EVEN' : aiPrediction === 'Odd' ? 'ODD' : 'OVER')
     setTradeResult(`✅ Loaded ${aiBestMarket} Bot with ${aiTradeType}`)
+  }
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
   }
 
   const markets = [
@@ -424,7 +599,7 @@ export default function HomePage() {
               <button className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 ${isDark ? 'bg-purple-500/20 text-purple-300' : 'bg-purple-100 text-purple-700'}`}>
                 <span>📊</span> Trade
               </button>
-              <button className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 ${isDark ? 'text-gray-400 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-100'}`}>
+              <button onClick={() => { setWalletTab('deposit'); setIsWalletOpen(true) }} className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 ${isDark ? 'text-gray-400 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-100'}`}>
                 <span>💰</span> Wallet
               </button>
               <button className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 ${isDark ? 'text-gray-400 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-100'}`}>
@@ -446,9 +621,7 @@ export default function HomePage() {
               <button
                 onClick={() => setIsAccountDropdownOpen(!isAccountDropdownOpen)}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition ${
-                  isLiveMode
-                    ? 'bg-yellow-500/10 border border-yellow-500/30'
-                    : isDark ? 'bg-white/5' : 'bg-gray-100'
+                  isLiveMode ? 'bg-yellow-500/10 border border-yellow-500/30' : isDark ? 'bg-white/5' : 'bg-gray-100'
                 }`}
               >
                 <span className={`font-bold ${isLiveMode ? 'text-yellow-400' : 'text-purple-400'}`}>$</span>
@@ -461,48 +634,29 @@ export default function HomePage() {
               {isAccountDropdownOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setIsAccountDropdownOpen(false)} />
-
-                  <div
-                    className={`absolute right-0 top-full mt-2 w-72 rounded-2xl border shadow-2xl z-50 overflow-hidden ${
-                      isDark ? 'bg-[#0d0818] border-purple-500/20' : 'bg-white border-gray-200'
-                    }`}
-                    style={{ boxShadow: '0 20px 50px rgba(0,0,0,0.3)' }}
-                  >
-                    <div className={`px-4 py-2 text-[10px] font-bold tracking-wider ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-                      SWITCH ACCOUNT
-                    </div>
-
-                    {/* Real account */}
-                    <button
-                      onClick={() => { setIsLiveMode(true); setIsAccountDropdownOpen(false) }}
-                      className={`w-full flex items-start gap-3 px-4 py-3 transition ${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'}`}
-                    >
+                  <div className={`absolute right-0 top-full mt-2 w-72 rounded-2xl border shadow-2xl z-50 overflow-hidden ${isDark ? 'bg-[#0d0818] border-purple-500/20' : 'bg-white border-gray-200'}`} style={{ boxShadow: '0 20px 50px rgba(0,0,0,0.3)' }}>
+                    <div className={`px-4 py-2 text-[10px] font-bold tracking-wider ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>SWITCH ACCOUNT</div>
+                    <button onClick={() => { setIsLiveMode(true); setIsAccountDropdownOpen(false) }} className={`w-full flex items-start gap-3 px-4 py-3 transition ${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'}`}>
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${isLiveMode ? 'bg-purple-500/20' : (isDark ? 'bg-white/5' : 'bg-gray-100')}`}>
                         {isLiveMode ? <span className="text-purple-400 text-sm">✓</span> : <span className="text-gray-400 text-sm">🔒</span>}
                       </div>
                       <div className="flex-1 text-left">
                         <div className="flex items-center justify-between">
                           <span className={`font-semibold text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>Real account</span>
-                          <span className={`font-bold text-sm ${isLiveMode ? 'text-yellow-400' : (isDark ? 'text-gray-400' : 'text-gray-600')}`}>$0.00</span>
+                          <span className={`font-bold text-sm ${isLiveMode ? 'text-yellow-400' : (isDark ? 'text-gray-400' : 'text-gray-600')}`}>${liveBalance.toFixed(2)}</span>
                         </div>
                         <div className={`text-[11px] mt-0.5 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Your live funds</div>
                       </div>
                     </button>
-
                     <div className={`h-px ${isDark ? 'bg-purple-500/10' : 'bg-gray-100'}`} />
-
-                    {/* Demo account */}
-                    <button
-                      onClick={() => { setIsLiveMode(false); setIsAccountDropdownOpen(false) }}
-                      className={`w-full flex items-start gap-3 px-4 py-3 transition ${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'}`}
-                    >
+                    <button onClick={() => { setIsLiveMode(false); setIsAccountDropdownOpen(false) }} className={`w-full flex items-start gap-3 px-4 py-3 transition ${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'}`}>
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${!isLiveMode ? 'bg-purple-500/20' : (isDark ? 'bg-white/5' : 'bg-gray-100')}`}>
                         {!isLiveMode ? <span className="text-purple-400 text-sm">✓</span> : <span className="text-yellow-500 text-sm">⚠️</span>}
                       </div>
                       <div className="flex-1 text-left">
                         <div className="flex items-center justify-between">
                           <span className={`font-semibold text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>Demo account</span>
-                          <span className={`font-bold text-sm ${!isLiveMode ? 'text-yellow-400' : (isDark ? 'text-gray-400' : 'text-gray-600')}`}>${balance.toFixed(2)}</span>
+                          <span className={`font-bold text-sm ${!isLiveMode ? 'text-yellow-400' : (isDark ? 'text-gray-400' : 'text-gray-600')}`}>${demoBalance.toFixed(2)}</span>
                         </div>
                         <div className={`text-[11px] mt-0.5 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Practice · virtual funds</div>
                       </div>
@@ -512,7 +666,7 @@ export default function HomePage() {
               )}
             </div>
 
-            <button className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium flex items-center gap-2">
+            <button onClick={() => { setWalletTab('deposit'); setIsWalletOpen(true) }} className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium flex items-center gap-2">
               <span>↓</span> Deposit
             </button>
             <button onClick={handleLogout} className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'bg-white/5' : 'bg-gray-100'}`}>
@@ -540,7 +694,6 @@ export default function HomePage() {
                   <span className="text-2xl">📊</span>
                 </div>
                 <span>No open positions yet.</span>
-                <span className={`text-[10px] ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>Place a trade to get started</span>
               </div>
             )}
             {activeTab === 'closed' && closedPositions.length === 0 && (
@@ -549,16 +702,13 @@ export default function HomePage() {
                   <span className="text-2xl">🕐</span>
                 </div>
                 <span>No closed positions yet.</span>
-                <span className={`text-[10px] ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>Your history will appear here</span>
               </div>
             )}
             {activeTab === 'open' && openPositions.map((pos) => (
               <div key={pos.id} className={`mb-2 p-2 rounded-lg text-left ${isDark ? 'bg-[#150d24]' : 'bg-gray-50'}`}>
                 <div className="flex justify-between text-xs">
                   <span>{pos.market}</span>
-                  <span className={pos.result === 'WIN' ? 'text-purple-400' : 'text-red-400'}>
-                    {pos.result === 'WIN' ? '+' : ''}${pos.payout.toFixed(2)}
-                  </span>
+                  <span className={pos.result === 'WIN' ? 'text-purple-400' : 'text-red-400'}>{pos.result === 'WIN' ? '+' : ''}${pos.payout.toFixed(2)}</span>
                 </div>
                 <div className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>{pos.type} · ${pos.stake}</div>
               </div>
@@ -567,9 +717,7 @@ export default function HomePage() {
               <div key={pos.id} className={`mb-2 p-2 rounded-lg text-left ${isDark ? 'bg-[#150d24]' : 'bg-gray-50'}`}>
                 <div className="flex justify-between text-xs">
                   <span>{pos.market}</span>
-                  <span className={pos.result === 'WIN' ? 'text-purple-400' : 'text-red-400'}>
-                    {pos.result === 'WIN' ? '+' : ''}${pos.payout.toFixed(2)}
-                  </span>
+                  <span className={pos.result === 'WIN' ? 'text-purple-400' : 'text-red-400'}>{pos.result === 'WIN' ? '+' : ''}${pos.payout.toFixed(2)}</span>
                 </div>
                 <div className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>{pos.type} · ${pos.stake}</div>
               </div>
@@ -582,9 +730,7 @@ export default function HomePage() {
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <div className="flex items-center gap-3">
               <select value={selectedMarket} onChange={(e) => setSelectedMarket(e.target.value)} className={`font-semibold outline-none cursor-pointer bg-transparent ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                {markets.map((m) => (
-                  <option key={m} value={m} className={isDark ? 'bg-[#150d24]' : 'bg-white'}>{m}</option>
-                ))}
+                {markets.map((m) => (<option key={m} value={m} className={isDark ? 'bg-[#150d24]' : 'bg-white'}>{m}</option>))}
               </select>
               <span className="text-xs bg-purple-500/10 text-purple-400 px-2 py-1 rounded-full flex items-center gap-1">
                 <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-pulse"></span> LIVE
@@ -593,9 +739,7 @@ export default function HomePage() {
             <div className="flex items-center gap-4">
               <div className="text-right">
                 <div className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>LAST DIGIT</div>
-                <div key={lastDigit} className="text-purple-400 text-2xl font-bold animate-[pulse_0.5s_ease-in-out]">
-                  {lastDigit}
-                </div>
+                <div key={lastDigit} className="text-purple-400 text-2xl font-bold animate-[pulse_0.5s_ease-in-out]">{lastDigit}</div>
               </div>
               <div className="text-right">
                 <div className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>PRICE</div>
@@ -613,9 +757,7 @@ export default function HomePage() {
             <div className="flex justify-between items-center mb-4">
               <div className={`text-xs font-medium ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                 <span className="text-purple-400">#</span> LIVE LAST DIGITS
-                <span className={`ml-2 text-[10px] font-normal ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-                  (last {digitHistoryRef.current.length || 0} ticks)
-                </span>
+                <span className={`ml-2 text-[10px] font-normal ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>(last {digitHistoryRef.current.length || 0} ticks)</span>
               </div>
               <div className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>tap a number to set your barrier</div>
             </div>
@@ -627,37 +769,18 @@ export default function HomePage() {
                 const isLast = digit === lastDigit
                 const isSelected = selectedDigit === digit
                 return (
-                  <button key={digit} onClick={() => setSelectedDigit(digit)}
-                    className="flex flex-col items-center gap-1.5 transition-transform hover:scale-105">
+                  <button key={digit} onClick={() => setSelectedDigit(digit)} className="flex flex-col items-center gap-1.5 transition-transform hover:scale-105">
                     <div className="relative w-12 h-12 flex items-center justify-center">
                       <svg className="absolute inset-0 -rotate-90" width="48" height="48">
-                        <circle cx="24" cy="24" r="22" fill="none"
-                          stroke={isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'} strokeWidth="3" />
-                        <circle cx="24" cy="24" r="22" fill="none"
-                          stroke={isLast ? '#a855f7' : isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
-                          strokeWidth="3"
-                          strokeDasharray={circumference}
-                          strokeDashoffset={offset}
-                          strokeLinecap="round"
-                          className="transition-all duration-500"
-                        />
+                        <circle cx="24" cy="24" r="22" fill="none" stroke={isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'} strokeWidth="3" />
+                        <circle cx="24" cy="24" r="22" fill="none" stroke={isLast ? '#a855f7' : isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'} strokeWidth="3" strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round" className="transition-all duration-500" />
                       </svg>
-                      <div className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
-                        isSelected
-                          ? isDark ? 'bg-purple-500/30 ring-2 ring-purple-400' : 'bg-purple-100 ring-2 ring-purple-400'
-                          : isDark ? 'bg-[#150d24]' : 'bg-white'
-                      }`}>
-                        <span className={`text-sm font-bold ${isLast ? 'text-purple-400' : isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                          {digit}
-                        </span>
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${isSelected ? isDark ? 'bg-purple-500/30 ring-2 ring-purple-400' : 'bg-purple-100 ring-2 ring-purple-400' : isDark ? 'bg-[#150d24]' : 'bg-white'}`}>
+                        <span className={`text-sm font-bold ${isLast ? 'text-purple-400' : isDark ? 'text-gray-300' : 'text-gray-700'}`}>{digit}</span>
                       </div>
-                      {isLast && (
-                        <div className="absolute -top-2 left-1/2 -translate-x-1/2 text-purple-400 text-xs animate-bounce">▾</div>
-                      )}
+                      {isLast && <div className="absolute -top-2 left-1/2 -translate-x-1/2 text-purple-400 text-xs animate-bounce">▾</div>}
                     </div>
-                    <span className={`text-[10px] font-medium ${isLast ? 'text-purple-400' : isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-                      {pct}%
-                    </span>
+                    <span className={`text-[10px] font-medium ${isLast ? 'text-purple-400' : isDark ? 'text-gray-500' : 'text-gray-400'}`}>{pct}%</span>
                   </button>
                 )
               })}
@@ -668,18 +791,9 @@ export default function HomePage() {
         {/* Trading Panel */}
         <div className={`lg:col-span-3 rounded-2xl border p-4 ${isDark ? 'bg-[#0d0818] border-purple-500/20' : 'bg-white border-gray-200'}`}>
           <div className="flex gap-2 mb-3">
-            <button onClick={() => setTradeMode('manual')}
-              className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${tradeMode === 'manual' ? 'bg-purple-600 text-white' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              Manual
-            </button>
-            <button onClick={() => setTradeMode('auto')}
-              className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${tradeMode === 'auto' ? 'bg-purple-600 text-white' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              Auto
-            </button>
-            <button onClick={() => setTradeMode('ai')}
-              className={`flex-1 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-1 transition ${tradeMode === 'ai' ? 'bg-purple-600 text-white' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              ✨ AI
-            </button>
+            <button onClick={() => setTradeMode('manual')} className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${tradeMode === 'manual' ? 'bg-purple-600 text-white' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>Manual</button>
+            <button onClick={() => setTradeMode('auto')} className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${tradeMode === 'auto' ? 'bg-purple-600 text-white' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>Auto</button>
+            <button onClick={() => setTradeMode('ai')} className={`flex-1 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-1 transition ${tradeMode === 'ai' ? 'bg-purple-600 text-white' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>✨ AI</button>
           </div>
 
           <div className="flex gap-2 mb-3">
@@ -693,10 +807,9 @@ export default function HomePage() {
           <div className="flex justify-between items-center mb-2">
             <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Stake (USD)</span>
             <div className="flex items-center gap-2">
-              <button onClick={resetDemo} className="text-[10px] px-2 py-0.5 border border-yellow-500/50 text-yellow-400 rounded hover:bg-yellow-500/10 transition">Reset demo</button>
+              {!isLiveMode && <button onClick={resetDemo} className="text-[10px] px-2 py-0.5 border border-yellow-500/50 text-yellow-400 rounded hover:bg-yellow-500/10 transition">Reset demo</button>}
               <div className={`flex items-center gap-1 text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                <span>💵</span>
-                <span>${balance.toFixed(2)}</span>
+                <span>💵</span><span>${balance.toFixed(2)}</span>
               </div>
             </div>
           </div>
@@ -722,25 +835,18 @@ export default function HomePage() {
               {tradeType === 'rise-fall' && (
                 <>
                   <div className="mb-3">
-                    <div className={`text-xs mb-2 flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                      <Clock className="w-3 h-3" /> Duration
-                    </div>
+                    <div className={`text-xs mb-2 flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}><Clock className="w-3 h-3" /> Duration</div>
                     <div className="grid grid-cols-5 gap-1.5">
                       {[{ v: 15, l: '15s' }, { v: 30, l: '30s' }, { v: 60, l: '1m' }, { v: 120, l: '2m' }, { v: 300, l: '5m' }].map((d) => (
-                        <button key={d.v} onClick={() => setDuration(d.v)}
-                          className={`py-2 rounded-lg text-xs font-medium transition ${duration === d.v ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
-                          {d.l}
-                        </button>
+                        <button key={d.v} onClick={() => setDuration(d.v)} className={`py-2 rounded-lg text-xs font-medium transition ${duration === d.v ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>{d.l}</button>
                       ))}
                     </div>
                   </div>
                   <div className="mb-3">
                     <div className={`text-xs mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Bot trades</div>
                     <div className="grid grid-cols-2 gap-2">
-                      <button onClick={() => setBotTrade('RISE')}
-                        className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'RISE' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>RISE</button>
-                      <button onClick={() => setBotTrade('FALL')}
-                        className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'FALL' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>FALL</button>
+                      <button onClick={() => setBotTrade('RISE')} className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'RISE' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>RISE</button>
+                      <button onClick={() => setBotTrade('FALL')} className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'FALL' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>FALL</button>
                     </div>
                   </div>
                 </>
@@ -748,90 +854,55 @@ export default function HomePage() {
               {tradeType === 'digits' && (
                 <>
                   <div className="grid grid-cols-3 gap-1.5 mb-3">
-                    <button onClick={() => setDigitMode('over-under')}
-                      className={`py-2 rounded-lg text-xs font-medium transition ${digitMode === 'over-under' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Over / Under</button>
-                    <button onClick={() => setDigitMode('even-odd')}
-                      className={`py-2 rounded-lg text-xs font-medium transition ${digitMode === 'even-odd' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Even / Odd</button>
-                    <button onClick={() => setDigitMode('matches-differs')}
-                      className={`py-2 rounded-lg text-xs font-medium transition ${digitMode === 'matches-differs' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Matches / Differs</button>
+                    <button onClick={() => setDigitMode('over-under')} className={`py-2 rounded-lg text-xs font-medium transition ${digitMode === 'over-under' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Over / Under</button>
+                    <button onClick={() => setDigitMode('even-odd')} className={`py-2 rounded-lg text-xs font-medium transition ${digitMode === 'even-odd' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Even / Odd</button>
+                    <button onClick={() => setDigitMode('matches-differs')} className={`py-2 rounded-lg text-xs font-medium transition ${digitMode === 'matches-differs' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Matches / Differs</button>
                   </div>
                   <div className={`flex items-center justify-between p-3 rounded-lg mb-3 ${isDark ? 'bg-[#150d24]' : 'bg-gray-50'}`}>
-                    <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                      {digitMode === 'matches-differs' ? 'Target digit' : 'Barrier digit'}
-                    </span>
+                    <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{digitMode === 'matches-differs' ? 'Target digit' : 'Barrier digit'}</span>
                     <div className="flex items-center gap-2">
                       <span className="w-8 h-8 rounded-lg bg-purple-600 text-white font-bold flex items-center justify-center">{selectedDigit}</span>
-                      <span className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>tap chart digits</span>
                     </div>
                   </div>
                   <div className="mb-3">
                     <div className={`text-xs mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Bot trades</div>
                     {digitMode === 'over-under' && (
                       <div className="grid grid-cols-2 gap-2">
-                        <button onClick={() => setBotTrade('OVER')}
-                          className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'OVER' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>OVER {selectedDigit}</button>
-                        <button onClick={() => setBotTrade('UNDER')}
-                          className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'UNDER' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>UNDER {selectedDigit}</button>
+                        <button onClick={() => setBotTrade('OVER')} className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'OVER' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>OVER {selectedDigit}</button>
+                        <button onClick={() => setBotTrade('UNDER')} className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'UNDER' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>UNDER {selectedDigit}</button>
                       </div>
                     )}
                     {digitMode === 'even-odd' && (
                       <div className="grid grid-cols-2 gap-2">
-                        <button onClick={() => setBotTrade('EVEN')}
-                          className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'EVEN' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>EVEN</button>
-                        <button onClick={() => setBotTrade('ODD')}
-                          className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'ODD' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>ODD</button>
+                        <button onClick={() => setBotTrade('EVEN')} className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'EVEN' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>EVEN</button>
+                        <button onClick={() => setBotTrade('ODD')} className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'ODD' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>ODD</button>
                       </div>
                     )}
                     {digitMode === 'matches-differs' && (
                       <div className="grid grid-cols-2 gap-2">
-                        <button onClick={() => setBotTrade('MATCHES')}
-                          className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'MATCHES' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>MATCHES {selectedDigit}</button>
-                        <button onClick={() => setBotTrade('DIFFERS')}
-                          className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'DIFFERS' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>DIFFERS {selectedDigit}</button>
+                        <button onClick={() => setBotTrade('MATCHES')} className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'MATCHES' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>MATCHES {selectedDigit}</button>
+                        <button onClick={() => setBotTrade('DIFFERS')} className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'DIFFERS' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>DIFFERS {selectedDigit}</button>
                       </div>
                     )}
                   </div>
                 </>
               )}
-
               <div className="grid grid-cols-2 gap-2 mb-3">
-                <div>
-                  <div className={`text-xs mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Martingale x</div>
-                  <input type="number" value={martingale} onChange={(e) => setMartingale(Number(e.target.value))}
-                    className={`w-full rounded-lg px-3 py-2 outline-none border text-sm transition ${isDark ? 'bg-[#150d24] text-white border-purple-500/20 focus:border-purple-500/50' : 'bg-gray-50 text-gray-900 border-gray-200 focus:border-purple-400'}`} />
-                </div>
-                <div>
-                  <div className={`text-xs mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Max runs</div>
-                  <input type="number" value={maxRuns} onChange={(e) => setMaxRuns(Number(e.target.value))}
-                    className={`w-full rounded-lg px-3 py-2 outline-none border text-sm transition ${isDark ? 'bg-[#150d24] text-white border-purple-500/20 focus:border-purple-500/50' : 'bg-gray-50 text-gray-900 border-gray-200 focus:border-purple-400'}`} />
-                </div>
+                <div><div className={`text-xs mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Martingale x</div>
+                  <input type="number" value={martingale} onChange={(e) => setMartingale(Number(e.target.value))} className={`w-full rounded-lg px-3 py-2 outline-none border text-sm ${isDark ? 'bg-[#150d24] text-white border-purple-500/20' : 'bg-gray-50 text-gray-900 border-gray-200'}`} /></div>
+                <div><div className={`text-xs mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Max runs</div>
+                  <input type="number" value={maxRuns} onChange={(e) => setMaxRuns(Number(e.target.value))} className={`w-full rounded-lg px-3 py-2 outline-none border text-sm ${isDark ? 'bg-[#150d24] text-white border-purple-500/20' : 'bg-gray-50 text-gray-900 border-gray-200'}`} /></div>
               </div>
-
               <div className="grid grid-cols-2 gap-2 mb-3">
-                <div>
-                  <div className={`text-xs mb-1 flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                    <span className="text-emerald-400">◉</span> Target profit ($)
-                  </div>
-                  <input type="number" value={targetProfit} onChange={(e) => setTargetProfit(Number(e.target.value))}
-                    className={`w-full rounded-lg px-3 py-2 outline-none border text-sm transition ${isDark ? 'bg-[#150d24] text-white border-purple-500/20 focus:border-purple-500/50' : 'bg-gray-50 text-gray-900 border-gray-200 focus:border-purple-400'}`} />
-                </div>
-                <div>
-                  <div className={`text-xs mb-1 flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                    <span className="text-red-400">◉</span> Stop loss ($)
-                  </div>
-                  <input type="number" value={stopLoss} onChange={(e) => setStopLoss(Number(e.target.value))}
-                    className={`w-full rounded-lg px-3 py-2 outline-none border text-sm transition ${isDark ? 'bg-[#150d24] text-white border-purple-500/20 focus:border-purple-500/50' : 'bg-gray-50 text-gray-900 border-gray-200 focus:border-purple-400'}`} />
-                </div>
+                <div><div className={`text-xs mb-1 flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}><span className="text-emerald-400">◉</span> Target profit ($)</div>
+                  <input type="number" value={targetProfit} onChange={(e) => setTargetProfit(Number(e.target.value))} className={`w-full rounded-lg px-3 py-2 outline-none border text-sm ${isDark ? 'bg-[#150d24] text-white border-purple-500/20' : 'bg-gray-50 text-gray-900 border-gray-200'}`} /></div>
+                <div><div className={`text-xs mb-1 flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}><span className="text-red-400">◉</span> Stop loss ($)</div>
+                  <input type="number" value={stopLoss} onChange={(e) => setStopLoss(Number(e.target.value))} className={`w-full rounded-lg px-3 py-2 outline-none border text-sm ${isDark ? 'bg-[#150d24] text-white border-purple-500/20' : 'bg-gray-50 text-gray-900 border-gray-200'}`} /></div>
               </div>
-
-              <button onClick={() => setIsBotRunning(!isBotRunning)}
-                className="w-full py-3 bg-purple-500 hover:bg-purple-600 text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 mb-2 hover:scale-[1.02] shadow-lg shadow-purple-500/30">
+              <button onClick={() => setIsBotRunning(!isBotRunning)} className="w-full py-3 bg-purple-500 hover:bg-purple-600 text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 mb-2 hover:scale-[1.02] shadow-lg shadow-purple-500/30">
                 <Play className="w-4 h-4" /> {isBotRunning ? 'Stop bot' : 'Start bot'}
               </button>
-
-              <p className={`text-[10px] leading-relaxed ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
-                ℹ️ The bot auto-places trades and multiplies your stake after a loss (martingale). It stops at your target profit, stop loss, or max runs.
-              </p>
+              <p className={`text-[10px] leading-relaxed ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>ℹ️ The bot auto-places trades and multiplies your stake after a loss (martingale).</p>
             </>
           )}
 
@@ -840,52 +911,23 @@ export default function HomePage() {
               {tradeType === 'rise-fall' && (
                 <>
                   <div className="mb-3">
-                    <div className={`text-xs mb-2 flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                      <Clock className="w-3 h-3" /> Duration
-                    </div>
+                    <div className={`text-xs mb-2 flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}><Clock className="w-3 h-3" /> Duration</div>
                     <div className="grid grid-cols-5 gap-1.5">
                       {[{ v: 15, l: '15s' }, { v: 30, l: '30s' }, { v: 60, l: '1m' }, { v: 120, l: '2m' }, { v: 300, l: '5m' }].map((d) => (
-                        <button key={d.v} onClick={() => setDuration(d.v)}
-                          className={`py-2 rounded-lg text-xs font-medium transition ${duration === d.v ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
-                          {d.l}
-                        </button>
+                        <button key={d.v} onClick={() => setDuration(d.v)} className={`py-2 rounded-lg text-xs font-medium transition ${duration === d.v ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>{d.l}</button>
                       ))}
                     </div>
                   </div>
                   <div className={`flex justify-between items-center p-3 rounded-lg mb-3 ${isDark ? 'bg-[#150d24]' : 'bg-gray-50'}`}>
-                    <div className={`text-xs flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                      <Zap className="w-3 h-3 text-purple-400" /> Potential payout
-                    </div>
+                    <div className={`text-xs flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}><Zap className="w-3 h-3 text-purple-400" /> Potential payout</div>
                     <div className="text-purple-400 font-bold">${potentialPayout.toFixed(2)}</div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
-                    <button onClick={() => executeTrade('RISE')} disabled={isTrading}
-                      className="py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition disabled:opacity-50 hover:scale-[1.02] shadow-lg shadow-emerald-500/20">
-                      {isTrading ? (
-                        <div className="flex items-center justify-center gap-2">
-                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          <span className="font-bold text-sm">Placing...</span>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center">
-                          <span className="font-bold text-sm">↑ RISE</span>
-                          <span className="text-[10px] opacity-80">higher</span>
-                        </div>
-                      )}
+                    <button onClick={() => executeTrade('RISE')} disabled={isTrading} className="py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition disabled:opacity-50 hover:scale-[1.02] shadow-lg shadow-emerald-500/20">
+                      {isTrading ? <div className="flex items-center justify-center gap-2"><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /><span className="font-bold text-sm">Placing...</span></div> : <div className="flex flex-col items-center"><span className="font-bold text-sm">↑ RISE</span><span className="text-[10px] opacity-80">higher</span></div>}
                     </button>
-                    <button onClick={() => executeTrade('FALL')} disabled={isTrading}
-                      className="py-4 bg-red-600 hover:bg-red-500 text-white rounded-xl transition disabled:opacity-50 hover:scale-[1.02] shadow-lg shadow-red-500/20">
-                      {isTrading ? (
-                        <div className="flex items-center justify-center gap-2">
-                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          <span className="font-bold text-sm">Placing...</span>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center">
-                          <span className="font-bold text-sm">↓ FALL</span>
-                          <span className="text-[10px] opacity-80">lower</span>
-                        </div>
-                      )}
+                    <button onClick={() => executeTrade('FALL')} disabled={isTrading} className="py-4 bg-red-600 hover:bg-red-500 text-white rounded-xl transition disabled:opacity-50 hover:scale-[1.02] shadow-lg shadow-red-500/20">
+                      {isTrading ? <div className="flex items-center justify-center gap-2"><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /><span className="font-bold text-sm">Placing...</span></div> : <div className="flex flex-col items-center"><span className="font-bold text-sm">↓ FALL</span><span className="text-[10px] opacity-80">lower</span></div>}
                     </button>
                   </div>
                 </>
@@ -894,17 +936,12 @@ export default function HomePage() {
               {tradeType === 'digits' && (
                 <>
                   <div className="grid grid-cols-3 gap-1.5 mb-3">
-                    <button onClick={() => setDigitMode('over-under')}
-                      className={`py-2 rounded-lg text-xs font-medium transition ${digitMode === 'over-under' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Over / Under</button>
-                    <button onClick={() => setDigitMode('even-odd')}
-                      className={`py-2 rounded-lg text-xs font-medium transition ${digitMode === 'even-odd' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Even / Odd</button>
-                    <button onClick={() => setDigitMode('matches-differs')}
-                      className={`py-2 rounded-lg text-xs font-medium transition ${digitMode === 'matches-differs' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Matches / Differs</button>
+                    <button onClick={() => setDigitMode('over-under')} className={`py-2 rounded-lg text-xs font-medium transition ${digitMode === 'over-under' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Over / Under</button>
+                    <button onClick={() => setDigitMode('even-odd')} className={`py-2 rounded-lg text-xs font-medium transition ${digitMode === 'even-odd' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Even / Odd</button>
+                    <button onClick={() => setDigitMode('matches-differs')} className={`py-2 rounded-lg text-xs font-medium transition ${digitMode === 'matches-differs' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Matches / Differs</button>
                   </div>
                   <div className={`flex items-center justify-between p-3 rounded-lg mb-3 ${isDark ? 'bg-[#150d24]' : 'bg-gray-50'}`}>
-                    <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                      {digitMode === 'matches-differs' ? 'Target digit' : 'Barrier digit'}
-                    </span>
+                    <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{digitMode === 'matches-differs' ? 'Target digit' : 'Barrier digit'}</span>
                     <div className="flex items-center gap-2">
                       <span className="w-8 h-8 rounded-lg bg-purple-600 text-white font-bold flex items-center justify-center">{selectedDigit}</span>
                       <span className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>tap chart digits</span>
@@ -912,60 +949,36 @@ export default function HomePage() {
                   </div>
                   {digitMode === 'over-under' && (
                     <div className="grid grid-cols-2 gap-2">
-                      <button onClick={() => { setDigitSide('OVER'); executeTrade('OVER') }} disabled={isTrading}
-                        className={`py-3 text-white rounded-xl transition disabled:opacity-50 hover:scale-[1.02] ${digitSide === 'OVER' ? 'bg-emerald-500 ring-2 ring-emerald-400 shadow-lg shadow-emerald-500/30' : 'bg-emerald-600 hover:bg-emerald-500'}`}>
-                        <div className="flex items-center justify-between px-2">
-                          <span className="font-bold text-xs">OVER {selectedDigit}</span>
-                          <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+{overPercent}%</span>
-                        </div>
+                      <button onClick={() => { setDigitSide('OVER'); executeTrade('OVER') }} disabled={isTrading} className={`py-3 text-white rounded-xl transition disabled:opacity-50 hover:scale-[1.02] ${digitSide === 'OVER' ? 'bg-emerald-500 ring-2 ring-emerald-400 shadow-lg shadow-emerald-500/30' : 'bg-emerald-600 hover:bg-emerald-500'}`}>
+                        <div className="flex items-center justify-between px-2"><span className="font-bold text-xs">OVER {selectedDigit}</span><span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+{overPercent}%</span></div>
                         <div className="text-[10px] opacity-90 mt-0.5 px-2 text-left">Payout ${(stake * overMultiplier).toFixed(2)}</div>
                       </button>
-                      <button onClick={() => { setDigitSide('UNDER'); executeTrade('UNDER') }} disabled={isTrading}
-                        className={`py-3 text-white rounded-xl transition disabled:opacity-50 hover:scale-[1.02] ${digitSide === 'UNDER' ? 'bg-red-500 ring-2 ring-red-400 shadow-lg shadow-red-500/30' : 'bg-red-600 hover:bg-red-500'}`}>
-                        <div className="flex items-center justify-between px-2">
-                          <span className="font-bold text-xs">UNDER {selectedDigit}</span>
-                          <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+{underPercent}%</span>
-                        </div>
+                      <button onClick={() => { setDigitSide('UNDER'); executeTrade('UNDER') }} disabled={isTrading} className={`py-3 text-white rounded-xl transition disabled:opacity-50 hover:scale-[1.02] ${digitSide === 'UNDER' ? 'bg-red-500 ring-2 ring-red-400 shadow-lg shadow-red-500/30' : 'bg-red-600 hover:bg-red-500'}`}>
+                        <div className="flex items-center justify-between px-2"><span className="font-bold text-xs">UNDER {selectedDigit}</span><span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+{underPercent}%</span></div>
                         <div className="text-[10px] opacity-90 mt-0.5 px-2 text-left">Payout ${(stake * underMultiplier).toFixed(2)}</div>
                       </button>
                     </div>
                   )}
                   {digitMode === 'even-odd' && (
                     <div className="grid grid-cols-2 gap-2">
-                      <button onClick={() => { setDigitSide('EVEN'); executeTrade('EVEN') }} disabled={isTrading}
-                        className={`py-3 text-white rounded-xl transition disabled:opacity-50 hover:scale-[1.02] ${digitSide === 'EVEN' ? 'bg-emerald-500 ring-2 ring-emerald-400 shadow-lg shadow-emerald-500/30' : 'bg-emerald-600 hover:bg-emerald-500'}`}>
-                        <div className="flex items-center justify-between px-2">
-                          <span className="font-bold text-xs">EVEN</span>
-                          <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+95%</span>
-                        </div>
+                      <button onClick={() => { setDigitSide('EVEN'); executeTrade('EVEN') }} disabled={isTrading} className={`py-3 text-white rounded-xl transition disabled:opacity-50 hover:scale-[1.02] ${digitSide === 'EVEN' ? 'bg-emerald-500 ring-2 ring-emerald-400 shadow-lg shadow-emerald-500/30' : 'bg-emerald-600 hover:bg-emerald-500'}`}>
+                        <div className="flex items-center justify-between px-2"><span className="font-bold text-xs">EVEN</span><span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+95%</span></div>
                         <div className="text-[10px] opacity-90 mt-0.5 px-2 text-left">Payout ${(stake * 1.95).toFixed(2)}</div>
                       </button>
-                      <button onClick={() => { setDigitSide('ODD'); executeTrade('ODD') }} disabled={isTrading}
-                        className={`py-3 text-white rounded-xl transition disabled:opacity-50 hover:scale-[1.02] ${digitSide === 'ODD' ? 'bg-red-500 ring-2 ring-red-400 shadow-lg shadow-red-500/30' : 'bg-red-600 hover:bg-red-500'}`}>
-                        <div className="flex items-center justify-between px-2">
-                          <span className="font-bold text-xs">ODD</span>
-                          <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+95%</span>
-                        </div>
+                      <button onClick={() => { setDigitSide('ODD'); executeTrade('ODD') }} disabled={isTrading} className={`py-3 text-white rounded-xl transition disabled:opacity-50 hover:scale-[1.02] ${digitSide === 'ODD' ? 'bg-red-500 ring-2 ring-red-400 shadow-lg shadow-red-500/30' : 'bg-red-600 hover:bg-red-500'}`}>
+                        <div className="flex items-center justify-between px-2"><span className="font-bold text-xs">ODD</span><span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+95%</span></div>
                         <div className="text-[10px] opacity-90 mt-0.5 px-2 text-left">Payout ${(stake * 1.95).toFixed(2)}</div>
                       </button>
                     </div>
                   )}
                   {digitMode === 'matches-differs' && (
                     <div className="grid grid-cols-2 gap-2">
-                      <button onClick={() => { setDigitSide('MATCHES'); executeTrade('MATCHES') }} disabled={isTrading}
-                        className={`py-3 text-white rounded-xl transition disabled:opacity-50 hover:scale-[1.02] ${digitSide === 'MATCHES' ? 'bg-emerald-500 ring-2 ring-emerald-400 shadow-lg shadow-emerald-500/30' : 'bg-emerald-600 hover:bg-emerald-500'}`}>
-                        <div className="flex items-center justify-between px-2">
-                          <span className="font-bold text-xs">MATCHES {selectedDigit}</span>
-                          <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+800%</span>
-                        </div>
+                      <button onClick={() => { setDigitSide('MATCHES'); executeTrade('MATCHES') }} disabled={isTrading} className={`py-3 text-white rounded-xl transition disabled:opacity-50 hover:scale-[1.02] ${digitSide === 'MATCHES' ? 'bg-emerald-500 ring-2 ring-emerald-400 shadow-lg shadow-emerald-500/30' : 'bg-emerald-600 hover:bg-emerald-500'}`}>
+                        <div className="flex items-center justify-between px-2"><span className="font-bold text-xs">MATCHES {selectedDigit}</span><span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+800%</span></div>
                         <div className="text-[10px] opacity-90 mt-0.5 px-2 text-left">Payout ${(stake * 9).toFixed(2)}</div>
                       </button>
-                      <button onClick={() => { setDigitSide('DIFFERS'); executeTrade('DIFFERS') }} disabled={isTrading}
-                        className={`py-3 text-white rounded-xl transition disabled:opacity-50 hover:scale-[1.02] ${digitSide === 'DIFFERS' ? 'bg-red-500 ring-2 ring-red-400 shadow-lg shadow-red-500/30' : 'bg-red-600 hover:bg-red-500'}`}>
-                        <div className="flex items-center justify-between px-2">
-                          <span className="font-bold text-xs">DIFFERS</span>
-                          <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+9%</span>
-                        </div>
+                      <button onClick={() => { setDigitSide('DIFFERS'); executeTrade('DIFFERS') }} disabled={isTrading} className={`py-3 text-white rounded-xl transition disabled:opacity-50 hover:scale-[1.02] ${digitSide === 'DIFFERS' ? 'bg-red-500 ring-2 ring-red-400 shadow-lg shadow-red-500/30' : 'bg-red-600 hover:bg-red-500'}`}>
+                        <div className="flex items-center justify-between px-2"><span className="font-bold text-xs">DIFFERS</span><span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">+9%</span></div>
                         <div className="text-[10px] opacity-90 mt-0.5 px-2 text-left">Payout ${(stake * 1.09).toFixed(2)}</div>
                       </button>
                     </div>
@@ -979,8 +992,7 @@ export default function HomePage() {
                     <div className={`text-xs mb-2 flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>📈 Multiplier</div>
                     <div className="grid grid-cols-4 gap-1.5">
                       {[100, 200, 400, 1000].map((m) => (
-                        <button key={m} onClick={() => setMultiplier(m)}
-                          className={`py-2 rounded-lg text-xs font-medium transition ${multiplier === m ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/30' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>x{m}</button>
+                        <button key={m} onClick={() => setMultiplier(m)} className={`py-2 rounded-lg text-xs font-medium transition ${multiplier === m ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/30' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>x{m}</button>
                       ))}
                     </div>
                   </div>
@@ -991,25 +1003,15 @@ export default function HomePage() {
                     </div>
                     <div className="flex justify-between text-xs">
                       <span className={isDark ? 'text-gray-400' : 'text-gray-600'}>Stop out at</span>
-                      <span className="text-red-400 font-medium">
-                        {multiplier === 100 ? '1.00% move' : multiplier === 200 ? '0.50% move' : multiplier === 400 ? '0.25% move' : multiplier === 1000 ? '0.10% move' : '1.00% move'}
-                      </span>
+                      <span className="text-red-400 font-medium">{multiplier === 100 ? '1.00% move' : multiplier === 200 ? '0.50% move' : multiplier === 400 ? '0.25% move' : multiplier === 1000 ? '0.10% move' : '1.00% move'}</span>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
-                    <button onClick={() => executeTrade('UP')} disabled={isTrading}
-                      className="py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition disabled:opacity-50 hover:scale-[1.02] shadow-lg shadow-emerald-500/20">
-                      <div className="flex flex-col items-center">
-                        <span className="font-bold text-sm">↑ UP</span>
-                        <span className="text-[10px] opacity-80">higher</span>
-                      </div>
+                    <button onClick={() => executeTrade('UP')} disabled={isTrading} className="py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition disabled:opacity-50 hover:scale-[1.02] shadow-lg shadow-emerald-500/20">
+                      <div className="flex flex-col items-center"><span className="font-bold text-sm">↑ UP</span><span className="text-[10px] opacity-80">higher</span></div>
                     </button>
-                    <button onClick={() => executeTrade('DOWN')} disabled={isTrading}
-                      className="py-4 bg-red-600 hover:bg-red-500 text-white rounded-xl transition disabled:opacity-50 hover:scale-[1.02] shadow-lg shadow-red-500/20">
-                      <div className="flex flex-col items-center">
-                        <span className="font-bold text-sm">↓ DOWN</span>
-                        <span className="text-[10px] opacity-80">lower</span>
-                      </div>
+                    <button onClick={() => executeTrade('DOWN')} disabled={isTrading} className="py-4 bg-red-600 hover:bg-red-500 text-white rounded-xl transition disabled:opacity-50 hover:scale-[1.02] shadow-lg shadow-red-500/20">
+                      <div className="flex flex-col items-center"><span className="font-bold text-sm">↓ DOWN</span><span className="text-[10px] opacity-80">lower</span></div>
                     </button>
                   </div>
                 </>
@@ -1024,6 +1026,175 @@ export default function HomePage() {
           )}
         </div>
       </div>
+
+      {/* ═══════════════════════════════════════════════════════
+          WALLET MODAL (Deposit + Withdraw)
+      ═══════════════════════════════════════════════════════ */}
+      {isWalletOpen && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <div className={`w-full max-w-md rounded-2xl border ${isDark ? 'bg-[#0d0818] border-purple-500/20' : 'bg-white border-gray-200'} max-h-[90vh] overflow-y-auto`}>
+            <div className={`flex items-center justify-between p-5 border-b ${isDark ? 'border-purple-500/20' : 'border-gray-200'}`}>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
+                  <Wallet className="w-5 h-5 text-purple-400" />
+                </div>
+                <div>
+                  <h3 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>Wallet</h3>
+                  <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                    {isLiveMode ? `Live · $${liveBalance.toFixed(2)}` : `Demo · $${demoBalance.toFixed(2)}`}
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => { setIsWalletOpen(false); setWalletMessage(null) }} className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-100 hover:bg-gray-200'}`}>
+                <X className={`w-4 h-4 ${isDark ? 'text-gray-400' : 'text-gray-600'}`} />
+              </button>
+            </div>
+
+            <div className="p-5">
+              {/* Deposit / Withdraw tabs */}
+              <div className="flex gap-2 mb-4">
+                <button onClick={() => { setWalletTab('deposit'); setWalletMessage(null) }} className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2 ${walletTab === 'deposit' ? 'bg-purple-600 text-white' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                  <ArrowDownToLine className="w-4 h-4" /> Deposit
+                </button>
+                <button onClick={() => { setWalletTab('withdraw'); setWalletMessage(null) }} className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2 ${walletTab === 'withdraw' ? 'bg-purple-600 text-white' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                  <ArrowUpFromLine className="w-4 h-4" /> Withdraw
+                </button>
+              </div>
+
+              {/* Payment method selector */}
+              <div className="flex gap-2 mb-4">
+                <button onClick={() => { setPaymentMethod('mpesa'); setWalletMessage(null) }} className={`flex-1 py-3 rounded-lg text-sm font-medium transition ${paymentMethod === 'mpesa' ? 'bg-emerald-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
+                  📱 M-Pesa
+                </button>
+                <button onClick={() => { setPaymentMethod('crypto'); setWalletMessage(null) }} className={`flex-1 py-3 rounded-lg text-sm font-medium transition ${paymentMethod === 'crypto' ? 'bg-orange-500 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
+                  ₿ Crypto
+                </button>
+              </div>
+
+              {/* ═══════ DEPOSIT ═══════ */}
+              {walletTab === 'deposit' && (
+                <>
+                  <div className="mb-4">
+                    <label className={`text-xs block mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Amount (USD)</label>
+                    <input type="number" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)}
+                      placeholder="0.00" min={1}
+                      className={`w-full rounded-lg px-4 py-3 outline-none border text-sm font-medium ${isDark ? 'bg-[#150d24] text-white border-purple-500/20 focus:border-purple-500/50' : 'bg-gray-50 text-gray-900 border-gray-200 focus:border-purple-400'}`} />
+                    <div className="grid grid-cols-4 gap-2 mt-2">
+                      {[10, 50, 100, 500].map((amt) => (
+                        <button key={amt} onClick={() => setDepositAmount(String(amt))}
+                          className={`py-2 rounded-lg text-xs font-medium ${depositAmount === String(amt) ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                          ${amt}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {paymentMethod === 'mpesa' && (
+                    <div className="mb-4">
+                      <label className={`text-xs block mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>M-Pesa Phone Number</label>
+                      <input type="tel" value={depositPhone} onChange={(e) => setDepositPhone(e.target.value)}
+                        placeholder="0712 345 678"
+                        className={`w-full rounded-lg px-4 py-3 outline-none border text-sm ${isDark ? 'bg-[#150d24] text-white border-purple-500/20 focus:border-purple-500/50' : 'bg-gray-50 text-gray-900 border-gray-200 focus:border-purple-400'}`} />
+                      <p className={`text-xs mt-2 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                        You'll receive an STK push on this number. Enter your M-Pesa PIN to complete the deposit.
+                      </p>
+                    </div>
+                  )}
+
+                  {paymentMethod === 'crypto' && (
+                    <>
+                      <div className="mb-4">
+                        <label className={`text-xs block mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Select Coin</label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {['USDT', 'BTC', 'ETH'].map((coin) => (
+                            <button key={coin} onClick={() => setCryptoCoin(coin)}
+                              className={`py-2 rounded-lg text-xs font-medium ${cryptoCoin === coin ? 'bg-orange-500 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
+                              {coin}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className={`p-3 rounded-lg mb-4 ${isDark ? 'bg-[#150d24]' : 'bg-gray-50'}`}>
+                        <div className={`text-xs mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Send {cryptoCoin} to:</div>
+                        <div className="flex items-center gap-2">
+                          <div className={`flex-1 text-xs font-mono break-all ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                            {CRYPTO_ADDRESSES[cryptoCoin]}
+                          </div>
+                          <button onClick={() => copyToClipboard(CRYPTO_ADDRESSES[cryptoCoin])} className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+                            {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-purple-400" />}
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {walletMessage && (
+                    <div className={`mb-4 p-3 rounded-lg text-sm ${walletMessage.includes('✅') ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : 'bg-red-500/10 text-red-400 border border-red-500/30'}`}>
+                      {walletMessage}
+                    </div>
+                  )}
+
+                  <button onClick={paymentMethod === 'mpesa' ? handleMpesaDeposit : handleCryptoDeposit}
+                    disabled={isProcessing || !depositAmount}
+                    className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-xl font-bold text-sm transition hover:scale-[1.02]">
+                    {isProcessing ? 'Processing...' : paymentMethod === 'mpesa' ? `Pay $${depositAmount || '0'} with M-Pesa` : `Deposit $${depositAmount || '0'} in ${cryptoCoin}`}
+                  </button>
+                </>
+              )}
+
+              {/* ═══════ WITHDRAW ═══════ */}
+              {walletTab === 'withdraw' && (
+                <>
+                  <div className="mb-4">
+                    <label className={`text-xs block mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Amount (USD)</label>
+                    <input type="number" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)}
+                      placeholder="0.00" min={1}
+                      className={`w-full rounded-lg px-4 py-3 outline-none border text-sm font-medium ${isDark ? 'bg-[#150d24] text-white border-purple-500/20 focus:border-purple-500/50' : 'bg-gray-50 text-gray-900 border-gray-200 focus:border-purple-400'}`} />
+                    <p className={`text-xs mt-2 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                      Available: ${balance.toFixed(2)}
+                    </p>
+                  </div>
+
+                  {paymentMethod === 'mpesa' && (
+                    <div className="mb-4">
+                      <label className={`text-xs block mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>M-Pesa Phone Number</label>
+                      <input type="tel" value={withdrawPhone} onChange={(e) => setWithdrawPhone(e.target.value)}
+                        placeholder="0712 345 678"
+                        className={`w-full rounded-lg px-4 py-3 outline-none border text-sm ${isDark ? 'bg-[#150d24] text-white border-purple-500/20 focus:border-purple-500/50' : 'bg-gray-50 text-gray-900 border-gray-200 focus:border-purple-400'}`} />
+                    </div>
+                  )}
+
+                  {paymentMethod === 'crypto' && (
+                    <div className="mb-4">
+                      <label className={`text-xs block mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Your {cryptoCoin} Address</label>
+                      <input type="text" value={withdrawAddress} onChange={(e) => setWithdrawAddress(e.target.value)}
+                        placeholder="Paste your wallet address"
+                        className={`w-full rounded-lg px-4 py-3 outline-none border text-sm font-mono ${isDark ? 'bg-[#150d24] text-white border-purple-500/20 focus:border-purple-500/50' : 'bg-gray-50 text-gray-900 border-gray-200 focus:border-purple-400'}`} />
+                    </div>
+                  )}
+
+                  {walletMessage && (
+                    <div className={`mb-4 p-3 rounded-lg text-sm ${walletMessage.includes('✅') ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : 'bg-red-500/10 text-red-400 border border-red-500/30'}`}>
+                      {walletMessage}
+                    </div>
+                  )}
+
+                  <button onClick={handleWithdraw}
+                    disabled={isProcessing || !withdrawAmount || parseFloat(withdrawAmount) > balance}
+                    className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-xl font-bold text-sm transition hover:scale-[1.02]">
+                    {isProcessing ? 'Submitting...' : `Request $${withdrawAmount || '0'} Withdrawal`}
+                  </button>
+
+                  <p className={`text-[11px] mt-3 text-center ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                    ⏳ Withdrawals are processed within 24 hours after admin approval.
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* AI Entry Scanner */}
       {tradeMode === 'ai' && (
@@ -1066,12 +1237,7 @@ export default function HomePage() {
                     <div className="text-xs text-gray-500 mb-3">Volatility 75 (1s) Index</div>
                     <div className="flex flex-wrap justify-center gap-1">
                       {aiMarkets.map((m) => (
-                        <span key={m}
-                          className={`text-[10px] px-2 py-0.5 rounded-full font-medium transition ${
-                            aiScannedMarkets.includes(m)
-                              ? 'bg-emerald-500/20 text-emerald-600 line-through'
-                              : 'bg-purple-500/20 text-purple-600'
-                          }`}>✓ {m}</span>
+                        <span key={m} className={`text-[10px] px-2 py-0.5 rounded-full font-medium transition ${aiScannedMarkets.includes(m) ? 'bg-emerald-500/20 text-emerald-600 line-through' : 'bg-purple-500/20 text-purple-600'}`}>✓ {m}</span>
                       ))}
                     </div>
                   </div>
@@ -1087,9 +1253,7 @@ export default function HomePage() {
                   <button disabled className="w-full py-3.5 bg-purple-400/60 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 mb-3 cursor-not-allowed">
                     <Search className="w-4 h-4" /> Scanning...
                   </button>
-                  <button disabled className="w-full py-3.5 rounded-xl font-bold text-sm bg-gray-100 text-gray-400 cursor-not-allowed">
-                    Load Scanner Bot
-                  </button>
+                  <button disabled className="w-full py-3.5 rounded-xl font-bold text-sm bg-gray-100 text-gray-400 cursor-not-allowed">Load Scanner Bot</button>
                 </>
               )}
 
@@ -1127,12 +1291,10 @@ export default function HomePage() {
                       <div className="h-full bg-purple-500 w-full" />
                     </div>
                   </div>
-                  <button onClick={runDeepScan}
-                    className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 mb-3 hover:scale-[1.02]">
+                  <button onClick={runDeepScan} className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 mb-3 hover:scale-[1.02]">
                     <Search className="w-4 h-4" /> Re-scan for Best Market
                   </button>
-                  <button onClick={loadScannerBot}
-                    className="w-full py-3.5 rounded-xl font-bold text-sm bg-white text-purple-600 border border-purple-300 hover:bg-purple-50 transition hover:scale-[1.02]">
+                  <button onClick={loadScannerBot} className="w-full py-3.5 rounded-xl font-bold text-sm bg-white text-purple-600 border border-purple-300 hover:bg-purple-50 transition hover:scale-[1.02]">
                     Load {aiBestMarket} Bot
                   </button>
                 </>
@@ -1147,13 +1309,10 @@ export default function HomePage() {
                     </div>
                     <div className="h-1.5 rounded-full overflow-hidden bg-gray-100" />
                   </div>
-                  <button onClick={runDeepScan}
-                    className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 mb-3 hover:scale-[1.02]">
+                  <button onClick={runDeepScan} className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 mb-3 hover:scale-[1.02]">
                     <Search className="w-4 h-4" /> Deep Scan for Best Market
                   </button>
-                  <button disabled className="w-full py-3.5 rounded-xl font-bold text-sm bg-gray-100 text-gray-400 cursor-not-allowed">
-                    Load Scanner Bot
-                  </button>
+                  <button disabled className="w-full py-3.5 rounded-xl font-bold text-sm bg-gray-100 text-gray-400 cursor-not-allowed">Load Scanner Bot</button>
                 </>
               )}
             </div>
