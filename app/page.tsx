@@ -80,11 +80,8 @@ export default function HomePage() {
   const isDark = theme === 'dark'
   const aiMarkets = ['V10', 'V25', 'V50', 'V75', 'V100', 'V10 1s', 'V25 1s', 'V50 1s', 'V75 1s', 'V100 1s']
 
-  // ═══════════════════════════════════════════════════════
-  // CRYPTO DEPOSIT ADDRESSES (replace with your own!)
-  // ═══════════════════════════════════════════════════════
   const CRYPTO_ADDRESSES: { [key: string]: string } = {
-    USDT: 'TQn9Y2khEsLJW1ChVWFMSMeRDow5KcbLSE', // TRC-20 USDT example
+    USDT: 'TQn9Y2khEsLJW1ChVWFMSMeRDow5KcbLSE',
     BTC: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
     ETH: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0',
   }
@@ -130,11 +127,15 @@ export default function HomePage() {
       if (data) {
         setDemoBalance(Number(data.demo_balance))
         setLiveBalance(Number(data.live_balance))
-        setBalance(Number(isLiveMode ? data.live_balance : data.demo_balance))
       }
     }
     loadBalance()
-  }, [isLoggedIn, user?.id, isLiveMode])
+  }, [isLoggedIn, user?.id])
+
+  // Update visible balance based on account mode
+  useEffect(() => {
+    setBalance(isLiveMode ? liveBalance : demoBalance)
+  }, [isLiveMode, liveBalance, demoBalance])
 
   // Load trade history
   useEffect(() => {
@@ -160,11 +161,6 @@ export default function HomePage() {
     }
     loadTrades()
   }, [isLoggedIn, user?.id])
-
-  // Update balance when switching accounts
-  useEffect(() => {
-    setBalance(isLiveMode ? liveBalance : demoBalance)
-  }, [isLiveMode, liveBalance, demoBalance])
 
   // Reset price on market change
   useEffect(() => {
@@ -311,7 +307,6 @@ export default function HomePage() {
       if (!amount || amount <= 0) throw new Error('Enter a valid amount')
       if (!depositPhone || depositPhone.length < 10) throw new Error('Enter a valid phone number')
 
-      // 1. Record deposit as pending in Supabase
       const { data: depositRecord, error: depositErr } = await supabase
         .from('deposits')
         .insert({
@@ -326,7 +321,6 @@ export default function HomePage() {
 
       if (depositErr) throw depositErr
 
-      // 2. Call backend API route to initiate STK Push
       const res = await fetch('/api/mpesa/stkpush', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -343,7 +337,6 @@ export default function HomePage() {
         setWalletMessage(`✅ Check your phone (${depositPhone}) and enter your M-Pesa PIN to complete the deposit.`)
       } else {
         setWalletMessage(`❌ ${result.error || 'Failed to initiate M-Pesa payment'}`)
-        // Mark deposit as failed
         await supabase.from('deposits').update({ status: 'failed' }).eq('id', depositRecord.id)
       }
     } catch (err: any) {
@@ -362,7 +355,6 @@ export default function HomePage() {
       const amount = parseFloat(depositAmount)
       if (!amount || amount <= 0) throw new Error('Enter a valid amount')
 
-      // Record deposit as pending — user will send crypto manually
       const { error: depositErr } = await supabase
         .from('deposits')
         .insert({
@@ -384,7 +376,7 @@ export default function HomePage() {
   }
 
   // ═══════════════════════════════════════════════════════
-  // WITHDRAWAL REQUEST
+  // WITHDRAWAL REQUEST — Deducts balance immediately
   // ═══════════════════════════════════════════════════════
   const handleWithdraw = async () => {
     setIsProcessing(true)
@@ -392,7 +384,7 @@ export default function HomePage() {
     try {
       const amount = parseFloat(withdrawAmount)
       if (!amount || amount <= 0) throw new Error('Enter a valid amount')
-      if (amount > balance) throw new Error('Insufficient balance')
+      if (amount > liveBalance) throw new Error('Insufficient live balance')
       if (paymentMethod === 'mpesa' && (!withdrawPhone || withdrawPhone.length < 10)) {
         throw new Error('Enter a valid phone number')
       }
@@ -400,6 +392,7 @@ export default function HomePage() {
         throw new Error('Enter a valid crypto address')
       }
 
+      // 1. Create withdrawal request
       const { error } = await supabase
         .from('withdrawals')
         .insert({
@@ -413,7 +406,25 @@ export default function HomePage() {
 
       if (error) throw error
 
-      setWalletMessage(`✅ Withdrawal request submitted. You will receive $${amount} after admin approval (typically within 24 hours).`)
+      // 2. Deduct from live balance immediately
+      const newLive = liveBalance - amount
+      await supabase
+        .from('balances')
+        .update({ live_balance: newLive, updated_at: new Date().toISOString() })
+        .eq('user_id', user.id)
+
+      setLiveBalance(newLive)
+
+      // 3. Record transaction
+      await supabase.from('transactions').insert({
+        user_id: user.id,
+        type: 'withdrawal',
+        amount: -amount,
+        balance_after: newLive,
+        description: `Withdrawal request (${paymentMethod})`,
+      })
+
+      setWalletMessage(`✅ Withdrawal request submitted. You will receive $${amount} after admin approval.`)
       setWithdrawAmount('')
     } catch (err: any) {
       setWalletMessage(`❌ ${err.message}`)
@@ -421,7 +432,7 @@ export default function HomePage() {
     setIsProcessing(false)
   }
 
-  // Execute trade (uses current account balance)
+  // Execute trade
   const executeTrade = async (prediction: string) => {
     setIsTrading(true)
     setTradeResult(null)
@@ -461,7 +472,6 @@ export default function HomePage() {
       setTimeout(() => setBalancePulse(false), 800)
       setOpenPositions((prev) => [contract, ...prev])
 
-      // Save trade
       try {
         await supabase.from('trades').insert({
           user_id: user.id, market: selectedMarket, trade_type: tradeType,
@@ -1027,9 +1037,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* ═══════════════════════════════════════════════════════
-          WALLET MODAL (Deposit + Withdraw)
-      ═══════════════════════════════════════════════════════ */}
+      {/* WALLET MODAL */}
       {isWalletOpen && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
           <div className={`w-full max-w-md rounded-2xl border ${isDark ? 'bg-[#0d0818] border-purple-500/20' : 'bg-white border-gray-200'} max-h-[90vh] overflow-y-auto`}>
@@ -1051,7 +1059,6 @@ export default function HomePage() {
             </div>
 
             <div className="p-5">
-              {/* Deposit / Withdraw tabs */}
               <div className="flex gap-2 mb-4">
                 <button onClick={() => { setWalletTab('deposit'); setWalletMessage(null) }} className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2 ${walletTab === 'deposit' ? 'bg-purple-600 text-white' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                   <ArrowDownToLine className="w-4 h-4" /> Deposit
@@ -1061,7 +1068,6 @@ export default function HomePage() {
                 </button>
               </div>
 
-              {/* Payment method selector */}
               <div className="flex gap-2 mb-4">
                 <button onClick={() => { setPaymentMethod('mpesa'); setWalletMessage(null) }} className={`flex-1 py-3 rounded-lg text-sm font-medium transition ${paymentMethod === 'mpesa' ? 'bg-emerald-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>
                   📱 M-Pesa
@@ -1071,13 +1077,11 @@ export default function HomePage() {
                 </button>
               </div>
 
-              {/* ═══════ DEPOSIT ═══════ */}
               {walletTab === 'deposit' && (
                 <>
                   <div className="mb-4">
                     <label className={`text-xs block mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Amount (USD)</label>
-                    <input type="number" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)}
-                      placeholder="0.00" min={1}
+                    <input type="number" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} placeholder="0.00" min={1}
                       className={`w-full rounded-lg px-4 py-3 outline-none border text-sm font-medium ${isDark ? 'bg-[#150d24] text-white border-purple-500/20 focus:border-purple-500/50' : 'bg-gray-50 text-gray-900 border-gray-200 focus:border-purple-400'}`} />
                     <div className="grid grid-cols-4 gap-2 mt-2">
                       {[10, 50, 100, 500].map((amt) => (
@@ -1092,8 +1096,7 @@ export default function HomePage() {
                   {paymentMethod === 'mpesa' && (
                     <div className="mb-4">
                       <label className={`text-xs block mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>M-Pesa Phone Number</label>
-                      <input type="tel" value={depositPhone} onChange={(e) => setDepositPhone(e.target.value)}
-                        placeholder="0712 345 678"
+                      <input type="tel" value={depositPhone} onChange={(e) => setDepositPhone(e.target.value)} placeholder="0712 345 678"
                         className={`w-full rounded-lg px-4 py-3 outline-none border text-sm ${isDark ? 'bg-[#150d24] text-white border-purple-500/20 focus:border-purple-500/50' : 'bg-gray-50 text-gray-900 border-gray-200 focus:border-purple-400'}`} />
                       <p className={`text-xs mt-2 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
                         You'll receive an STK push on this number. Enter your M-Pesa PIN to complete the deposit.
@@ -1114,7 +1117,6 @@ export default function HomePage() {
                           ))}
                         </div>
                       </div>
-
                       <div className={`p-3 rounded-lg mb-4 ${isDark ? 'bg-[#150d24]' : 'bg-gray-50'}`}>
                         <div className={`text-xs mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Send {cryptoCoin} to:</div>
                         <div className="flex items-center gap-2">
@@ -1143,24 +1145,21 @@ export default function HomePage() {
                 </>
               )}
 
-              {/* ═══════ WITHDRAW ═══════ */}
               {walletTab === 'withdraw' && (
                 <>
                   <div className="mb-4">
                     <label className={`text-xs block mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Amount (USD)</label>
-                    <input type="number" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)}
-                      placeholder="0.00" min={1}
+                    <input type="number" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} placeholder="0.00" min={1}
                       className={`w-full rounded-lg px-4 py-3 outline-none border text-sm font-medium ${isDark ? 'bg-[#150d24] text-white border-purple-500/20 focus:border-purple-500/50' : 'bg-gray-50 text-gray-900 border-gray-200 focus:border-purple-400'}`} />
                     <p className={`text-xs mt-2 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-                      Available: ${balance.toFixed(2)}
+                      Available: ${liveBalance.toFixed(2)}
                     </p>
                   </div>
 
                   {paymentMethod === 'mpesa' && (
                     <div className="mb-4">
                       <label className={`text-xs block mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>M-Pesa Phone Number</label>
-                      <input type="tel" value={withdrawPhone} onChange={(e) => setWithdrawPhone(e.target.value)}
-                        placeholder="0712 345 678"
+                      <input type="tel" value={withdrawPhone} onChange={(e) => setWithdrawPhone(e.target.value)} placeholder="0712 345 678"
                         className={`w-full rounded-lg px-4 py-3 outline-none border text-sm ${isDark ? 'bg-[#150d24] text-white border-purple-500/20 focus:border-purple-500/50' : 'bg-gray-50 text-gray-900 border-gray-200 focus:border-purple-400'}`} />
                     </div>
                   )}
@@ -1168,8 +1167,7 @@ export default function HomePage() {
                   {paymentMethod === 'crypto' && (
                     <div className="mb-4">
                       <label className={`text-xs block mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Your {cryptoCoin} Address</label>
-                      <input type="text" value={withdrawAddress} onChange={(e) => setWithdrawAddress(e.target.value)}
-                        placeholder="Paste your wallet address"
+                      <input type="text" value={withdrawAddress} onChange={(e) => setWithdrawAddress(e.target.value)} placeholder="Paste your wallet address"
                         className={`w-full rounded-lg px-4 py-3 outline-none border text-sm font-mono ${isDark ? 'bg-[#150d24] text-white border-purple-500/20 focus:border-purple-500/50' : 'bg-gray-50 text-gray-900 border-gray-200 focus:border-purple-400'}`} />
                     </div>
                   )}
@@ -1181,7 +1179,7 @@ export default function HomePage() {
                   )}
 
                   <button onClick={handleWithdraw}
-                    disabled={isProcessing || !withdrawAmount || parseFloat(withdrawAmount) > balance}
+                    disabled={isProcessing || !withdrawAmount || parseFloat(withdrawAmount) > liveBalance}
                     className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-xl font-bold text-sm transition hover:scale-[1.02]">
                     {isProcessing ? 'Submitting...' : `Request $${withdrawAmount || '0'} Withdrawal`}
                   </button>
