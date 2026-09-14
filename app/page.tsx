@@ -102,7 +102,6 @@ export default function HomePage() {
     setDigitPercentages(pcts)
   }
 
-  // Auth
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) { setIsLoggedIn(true); setUser(session.user); setShowDashboard(true) }
@@ -114,7 +113,6 @@ export default function HomePage() {
     return () => subscription.unsubscribe()
   }, [])
 
-  // Load balances
   useEffect(() => {
     if (!isLoggedIn || !user?.id) return
     const loadBalance = async () => {
@@ -131,7 +129,6 @@ export default function HomePage() {
     setBalance(isLiveMode ? liveBalance : demoBalance)
   }, [isLiveMode, liveBalance, demoBalance])
 
-  // Load trade history
   useEffect(() => {
     if (!isLoggedIn || !user?.id) return
     const loadTrades = async () => {
@@ -155,7 +152,6 @@ export default function HomePage() {
     loadTrades()
   }, [isLoggedIn, user?.id])
 
-  // Reset price on market change
   useEffect(() => {
     if (!showDashboard) return
     const basePrices: { [key: string]: number } = {
@@ -172,7 +168,6 @@ export default function HomePage() {
     setDigitPercentages(Array(10).fill(10))
   }, [selectedMarket, showDashboard])
 
-  // Deriv + simulation
   useEffect(() => {
     let derivClient: DerivClient
     let isMounted = true
@@ -209,7 +204,6 @@ export default function HomePage() {
     }
   }, [])
 
-  // Chart setup
   useEffect(() => {
     if (!showDashboard) return
     let timeout: NodeJS.Timeout
@@ -716,7 +710,7 @@ export default function HomePage() {
                 <span className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>DerivEngine</span>
               </div>
               <div className={`flex flex-wrap gap-6 text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                <Link href="/how-it-works" className="hover:text-purple-400 transition">How it works</Link>
+                <Link href="/responsible-trading" className="hover:text-purple-400 transition">Responsible Trading</Link>
                 <Link href="/terms" className="hover:text-purple-400 transition">Terms</Link>
                 <Link href="/privacy" className="hover:text-purple-400 transition">Privacy</Link>
                 <Link href="/login" className="hover:text-purple-400 transition">Sign in</Link>
@@ -735,7 +729,7 @@ export default function HomePage() {
   }
 
   // ═══════════════════════════════════════════════════════
-  // DASHBOARD (unchanged)
+  // DASHBOARD
   // ═══════════════════════════════════════════════════════
   return (
     <main className={`min-h-screen ${isDark ? 'bg-[#0a0613] text-white' : 'bg-gray-50 text-gray-900'}`}>
@@ -979,82 +973,6 @@ export default function HomePage() {
             ))}
           </div>
 
-          {tradeMode === 'auto' && (
-            <>
-              {tradeType === 'rise-fall' && (
-                <>
-                  <div className="mb-3">
-                    <div className={`text-xs mb-2 flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}><Clock className="w-3 h-3" /> Duration</div>
-                    <div className="grid grid-cols-5 gap-1.5">
-                      {[{ v: 15, l: '15s' }, { v: 30, l: '30s' }, { v: 60, l: '1m' }, { v: 120, l: '2m' }, { v: 300, l: '5m' }].map((d) => (
-                        <button key={d.v} onClick={() => setDuration(d.v)} className={`py-2 rounded-lg text-xs font-medium transition ${duration === d.v ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>{d.l}</button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="mb-3">
-                    <div className={`text-xs mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Bot trades</div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button onClick={() => setBotTrade('RISE')} className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'RISE' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>RISE</button>
-                      <button onClick={() => setBotTrade('FALL')} className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'FALL' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>FALL</button>
-                    </div>
-                  </div>
-                </>
-              )}
-              {tradeType === 'digits' && (
-                <>
-                  <div className="grid grid-cols-3 gap-1.5 mb-3">
-                    <button onClick={() => setDigitMode('over-under')} className={`py-2 rounded-lg text-xs font-medium transition ${digitMode === 'over-under' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Over / Under</button>
-                    <button onClick={() => setDigitMode('even-odd')} className={`py-2 rounded-lg text-xs font-medium transition ${digitMode === 'even-odd' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Even / Odd</button>
-                    <button onClick={() => setDigitMode('matches-differs')} className={`py-2 rounded-lg text-xs font-medium transition ${digitMode === 'matches-differs' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Matches / Differs</button>
-                  </div>
-                  <div className={`flex items-center justify-between p-3 rounded-lg mb-3 ${isDark ? 'bg-[#150d24]' : 'bg-gray-50'}`}>
-                    <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{digitMode === 'matches-differs' ? 'Target digit' : 'Barrier digit'}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="w-8 h-8 rounded-lg bg-purple-600 text-white font-bold flex items-center justify-center">{selectedDigit}</span>
-                    </div>
-                  </div>
-                  <div className="mb-3">
-                    <div className={`text-xs mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Bot trades</div>
-                    {digitMode === 'over-under' && (
-                      <div className="grid grid-cols-2 gap-2">
-                        <button onClick={() => setBotTrade('OVER')} className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'OVER' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>OVER {selectedDigit}</button>
-                        <button onClick={() => setBotTrade('UNDER')} className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'UNDER' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>UNDER {selectedDigit}</button>
-                      </div>
-                    )}
-                    {digitMode === 'even-odd' && (
-                      <div className="grid grid-cols-2 gap-2">
-                        <button onClick={() => setBotTrade('EVEN')} className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'EVEN' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>EVEN</button>
-                        <button onClick={() => setBotTrade('ODD')} className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'ODD' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>ODD</button>
-                      </div>
-                    )}
-                    {digitMode === 'matches-differs' && (
-                      <div className="grid grid-cols-2 gap-2">
-                        <button onClick={() => setBotTrade('MATCHES')} className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'MATCHES' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>MATCHES {selectedDigit}</button>
-                        <button onClick={() => setBotTrade('DIFFERS')} className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'DIFFERS' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>DIFFERS {selectedDigit}</button>
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                <div><div className={`text-xs mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Martingale x</div>
-                  <input type="number" value={martingale} onChange={(e) => setMartingale(Number(e.target.value))} className={`w-full rounded-lg px-3 py-2 outline-none border text-sm ${isDark ? 'bg-[#150d24] text-white border-purple-500/20' : 'bg-gray-50 text-gray-900 border-gray-200'}`} /></div>
-                <div><div className={`text-xs mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Max runs</div>
-                  <input type="number" value={maxRuns} onChange={(e) => setMaxRuns(Number(e.target.value))} className={`w-full rounded-lg px-3 py-2 outline-none border text-sm ${isDark ? 'bg-[#150d24] text-white border-purple-500/20' : 'bg-gray-50 text-gray-900 border-gray-200'}`} /></div>
-              </div>
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                <div><div className={`text-xs mb-1 flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}><span className="text-emerald-400">◉</span> Target profit ($)</div>
-                  <input type="number" value={targetProfit} onChange={(e) => setTargetProfit(Number(e.target.value))} className={`w-full rounded-lg px-3 py-2 outline-none border text-sm ${isDark ? 'bg-[#150d24] text-white border-purple-500/20' : 'bg-gray-50 text-gray-900 border-gray-200'}`} /></div>
-                <div><div className={`text-xs mb-1 flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}><span className="text-red-400">◉</span> Stop loss ($)</div>
-                  <input type="number" value={stopLoss} onChange={(e) => setStopLoss(Number(e.target.value))} className={`w-full rounded-lg px-3 py-2 outline-none border text-sm ${isDark ? 'bg-[#150d24] text-white border-purple-500/20' : 'bg-gray-50 text-gray-900 border-gray-200'}`} /></div>
-              </div>
-              <button onClick={() => setIsBotRunning(!isBotRunning)} className="w-full py-3 bg-purple-500 hover:bg-purple-600 text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 mb-2 hover:scale-[1.02] shadow-lg shadow-purple-500/30">
-                <Play className="w-4 h-4" /> {isBotRunning ? 'Stop bot' : 'Start bot'}
-              </button>
-              <p className={`text-[10px] leading-relaxed ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>ℹ️ The bot auto-places trades and multiplies your stake after a loss (martingale).</p>
-            </>
-          )}
-
           {tradeMode === 'manual' && (
             <>
               {tradeType === 'rise-fall' && (
@@ -1168,8 +1086,84 @@ export default function HomePage() {
             </>
           )}
 
+          {tradeMode === 'auto' && (
+            <>
+              {tradeType === 'rise-fall' && (
+                <>
+                  <div className="mb-3">
+                    <div className={`text-xs mb-2 flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}><Clock className="w-3 h-3" /> Duration</div>
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {[{ v: 15, l: '15s' }, { v: 30, l: '30s' }, { v: 60, l: '1m' }, { v: 120, l: '2m' }, { v: 300, l: '5m' }].map((d) => (
+                        <button key={d.v} onClick={() => setDuration(d.v)} className={`py-2 rounded-lg text-xs font-medium transition ${duration === d.v ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>{d.l}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="mb-3">
+                    <div className={`text-xs mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Bot trades</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button onClick={() => setBotTrade('RISE')} className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'RISE' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>RISE</button>
+                      <button onClick={() => setBotTrade('FALL')} className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'FALL' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>FALL</button>
+                    </div>
+                  </div>
+                </>
+              )}
+              {tradeType === 'digits' && (
+                <>
+                  <div className="grid grid-cols-3 gap-1.5 mb-3">
+                    <button onClick={() => setDigitMode('over-under')} className={`py-2 rounded-lg text-xs font-medium transition ${digitMode === 'over-under' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Over / Under</button>
+                    <button onClick={() => setDigitMode('even-odd')} className={`py-2 rounded-lg text-xs font-medium transition ${digitMode === 'even-odd' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Even / Odd</button>
+                    <button onClick={() => setDigitMode('matches-differs')} className={`py-2 rounded-lg text-xs font-medium transition ${digitMode === 'matches-differs' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600'}`}>Matches / Differs</button>
+                  </div>
+                  <div className={`flex items-center justify-between p-3 rounded-lg mb-3 ${isDark ? 'bg-[#150d24]' : 'bg-gray-50'}`}>
+                    <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{digitMode === 'matches-differs' ? 'Target digit' : 'Barrier digit'}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="w-8 h-8 rounded-lg bg-purple-600 text-white font-bold flex items-center justify-center">{selectedDigit}</span>
+                    </div>
+                  </div>
+                  <div className="mb-3">
+                    <div className={`text-xs mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Bot trades</div>
+                    {digitMode === 'over-under' && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <button onClick={() => setBotTrade('OVER')} className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'OVER' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>OVER {selectedDigit}</button>
+                        <button onClick={() => setBotTrade('UNDER')} className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'UNDER' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>UNDER {selectedDigit}</button>
+                      </div>
+                    )}
+                    {digitMode === 'even-odd' && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <button onClick={() => setBotTrade('EVEN')} className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'EVEN' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>EVEN</button>
+                        <button onClick={() => setBotTrade('ODD')} className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'ODD' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>ODD</button>
+                      </div>
+                    )}
+                    {digitMode === 'matches-differs' && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <button onClick={() => setBotTrade('MATCHES')} className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'MATCHES' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>MATCHES {selectedDigit}</button>
+                        <button onClick={() => setBotTrade('DIFFERS')} className={`py-3 rounded-lg text-xs font-bold transition ${botTrade === 'DIFFERS' ? 'bg-purple-600 text-white' : isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700'}`}>DIFFERS {selectedDigit}</button>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <div><div className={`text-xs mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Martingale x</div>
+                  <input type="number" value={martingale} onChange={(e) => setMartingale(Number(e.target.value))} className={`w-full rounded-lg px-3 py-2 outline-none border text-sm ${isDark ? 'bg-[#150d24] text-white border-purple-500/20' : 'bg-gray-50 text-gray-900 border-gray-200'}`} /></div>
+                <div><div className={`text-xs mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Max runs</div>
+                  <input type="number" value={maxRuns} onChange={(e) => setMaxRuns(Number(e.target.value))} className={`w-full rounded-lg px-3 py-2 outline-none border text-sm ${isDark ? 'bg-[#150d24] text-white border-purple-500/20' : 'bg-gray-50 text-gray-900 border-gray-200'}`} /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <div><div className={`text-xs mb-1 flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}><span className="text-emerald-400">◉</span> Target profit ($)</div>
+                  <input type="number" value={targetProfit} onChange={(e) => setTargetProfit(Number(e.target.value))} className={`w-full rounded-lg px-3 py-2 outline-none border text-sm ${isDark ? 'bg-[#150d24] text-white border-purple-500/20' : 'bg-gray-50 text-gray-900 border-gray-200'}`} /></div>
+                <div><div className={`text-xs mb-1 flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}><span className="text-red-400">◉</span> Stop loss ($)</div>
+                  <input type="number" value={stopLoss} onChange={(e) => setStopLoss(Number(e.target.value))} className={`w-full rounded-lg px-3 py-2 outline-none border text-sm ${isDark ? 'bg-[#150d24] text-white border-purple-500/20' : 'bg-gray-50 text-gray-900 border-gray-200'}`} /></div>
+              </div>
+              <button onClick={() => setIsBotRunning(!isBotRunning)} className="w-full py-3 bg-purple-500 hover:bg-purple-600 text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 mb-2 hover:scale-[1.02] shadow-lg shadow-purple-500/30">
+                <Play className="w-4 h-4" /> {isBotRunning ? 'Stop bot' : 'Start bot'}
+              </button>
+              <p className={`text-[10px] leading-relaxed ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>ℹ️ The bot auto-places trades and multiplies your stake after a loss (martingale).</p>
+            </>
+          )}
+
           {tradeResult && (
-            <div className={`mt-3 p-3 rounded-lg text-center text-sm animate-[slideIn_0.3s_ease-out] ${tradeResult.includes('won') ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'bg-red-500/20 text-red-300 border border-red-500/30'}`}>
+            <div className={`mt-3 p-3 rounded-lg text-center text-sm ${tradeResult.includes('won') ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'bg-red-500/20 text-red-300 border border-red-500/30'}`}>
               {tradeResult}
             </div>
           )}
