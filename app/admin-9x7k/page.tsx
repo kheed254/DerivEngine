@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import {
   Shield, Users, ArrowDownToLine, ArrowUpFromLine, TrendingUp, LogOut,
-  Loader2, DollarSign, Activity, Check, X, RefreshCw, Ban
+  Loader2, Check, X, RefreshCw
 } from 'lucide-react'
 
 export default function AdminPage() {
@@ -13,10 +13,8 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
   const [userEmail, setUserEmail] = useState('')
-  const [userName, setUserName] = useState('')
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'deposits' | 'withdrawals' | 'trades'>('overview')
 
-  // Data
   const [stats, setStats] = useState({ users: 0, deposits: 0, withdrawals: 0, profit: 0, pendingWithdrawals: 0 })
   const [users, setUsers] = useState<any[]>([])
   const [deposits, setDeposits] = useState<any[]>([])
@@ -37,7 +35,6 @@ export default function AdminPage() {
         .single()
 
       if (!profile?.is_admin) { router.push('/'); return }
-      setUserName(profile.full_name || session.user.email || '')
       setIsAdmin(true)
       setLoading(false)
       loadAllData()
@@ -48,7 +45,6 @@ export default function AdminPage() {
   const loadAllData = async () => {
     setRefreshing(true)
     try {
-      // Load all users
       const { data: usersData } = await supabase.from('profiles').select('*')
       const { data: balancesData } = await supabase.from('balances').select('*')
 
@@ -62,7 +58,6 @@ export default function AdminPage() {
       })
       setUsers(mergedUsers)
 
-      // Load deposits
       const { data: depositsData } = await supabase
         .from('deposits')
         .select('*')
@@ -70,7 +65,6 @@ export default function AdminPage() {
         .limit(100)
       setDeposits(depositsData || [])
 
-      // Load withdrawals
       const { data: withdrawalsData } = await supabase
         .from('withdrawals')
         .select('*')
@@ -78,7 +72,6 @@ export default function AdminPage() {
         .limit(100)
       setWithdrawals(withdrawalsData || [])
 
-      // Load trades
       const { data: tradesData } = await supabase
         .from('trades')
         .select('*')
@@ -86,7 +79,6 @@ export default function AdminPage() {
         .limit(100)
       setTrades(tradesData || [])
 
-      // Compute stats
       const totalDeposits = (depositsData || [])
         .filter((d: any) => d.status === 'completed')
         .reduce((sum: number, d: any) => sum + Number(d.amount), 0)
@@ -98,7 +90,6 @@ export default function AdminPage() {
       const pendingWithdrawals = (withdrawalsData || [])
         .filter((w: any) => w.status === 'pending').length
 
-      // Platform P&L = sum of all negative user payouts (when users lose)
       const platformPnL = (tradesData || []).reduce((sum: number, t: any) => {
         return sum + (t.result === 'LOSS' ? Number(t.stake) : -Number(t.payout - t.stake))
       }, 0)
@@ -123,8 +114,32 @@ export default function AdminPage() {
       if (!wd || !session) return
 
       if (action === 'approve') {
+        // 1. Mark as approved
         await supabase.from('withdrawals').update({ status: 'approved' }).eq('id', id)
-        // Note: Real M-Pesa B2C payout would be triggered here
+        setWithdrawals((prev) =>
+          prev.map((w) => (w.id === id ? { ...w, status: 'approved' } : w))
+        )
+
+        // 2. Trigger B2C payout if M-Pesa
+        if (wd.method === 'mpesa' && wd.phone) {
+          const res = await fetch('/api/mpesa/b2c', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ withdrawalId: id }),
+          })
+          const result = await res.json()
+          console.log('📤 B2C result:', result)
+
+          if (result.success) {
+            loadAllData()
+          } else {
+            console.error('❌ B2C failed:', result.error)
+          }
+        } else {
+          // Crypto: just mark as paid (manual process)
+          await supabase.from('withdrawals').update({ status: 'paid' }).eq('id', id)
+          loadAllData()
+        }
       } else {
         // Reject — refund user's live balance
         const { data: bal } = await supabase
@@ -136,6 +151,16 @@ export default function AdminPage() {
         const refunded = Number(bal?.live_balance || 0) + Number(wd.amount)
         await supabase.from('balances').update({ live_balance: refunded }).eq('user_id', wd.user_id)
         await supabase.from('withdrawals').update({ status: 'rejected' }).eq('id', id)
+
+        await supabase.from('transactions').insert({
+          user_id: wd.user_id,
+          type: 'withdrawal_refund',
+          amount: Number(wd.amount),
+          balance_after: refunded,
+          description: `Withdrawal rejected — refund`,
+        })
+
+        loadAllData()
       }
 
       // Log admin action
@@ -146,8 +171,6 @@ export default function AdminPage() {
         target_id: id,
         details: { amount: wd.amount, user_id: wd.user_id },
       })
-
-      loadAllData()
     } catch (err) {
       console.error('❌ Withdrawal action error:', err)
     }
@@ -180,7 +203,7 @@ export default function AdminPage() {
       pending: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
       processing: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
       completed: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-      approved: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+      approved: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
       paid: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
       failed: 'bg-red-500/20 text-red-400 border-red-500/30',
       rejected: 'bg-red-500/20 text-red-400 border-red-500/30',
@@ -242,7 +265,6 @@ export default function AdminPage() {
       </div>
 
       <div className="p-6">
-        {/* OVERVIEW */}
         {activeTab === 'overview' && (
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -291,7 +313,6 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* USERS */}
         {activeTab === 'users' && (
           <div className="bg-[#0d0818] border border-purple-500/20 rounded-2xl overflow-hidden">
             <div className="p-4 border-b border-purple-500/20">
@@ -329,7 +350,6 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* DEPOSITS */}
         {activeTab === 'deposits' && (
           <div className="bg-[#0d0818] border border-purple-500/20 rounded-2xl overflow-hidden">
             <div className="p-4 border-b border-purple-500/20">
@@ -367,7 +387,6 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* WITHDRAWALS */}
         {activeTab === 'withdrawals' && (
           <div className="bg-[#0d0818] border border-purple-500/20 rounded-2xl overflow-hidden">
             <div className="p-4 border-b border-purple-500/20">
@@ -420,7 +439,6 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* TRADES */}
         {activeTab === 'trades' && (
           <div className="bg-[#0d0818] border border-purple-500/20 rounded-2xl overflow-hidden">
             <div className="p-4 border-b border-purple-500/20">
@@ -468,7 +486,6 @@ export default function AdminPage() {
   )
 }
 
-// ─── Stat Card Component ───
 function StatCard({ label, value, icon: Icon, color }: { label: string; value: string; icon: any; color: string }) {
   const colors: { [key: string]: string } = {
     purple: 'from-purple-500/20 to-purple-500/5 border-purple-500/30',
