@@ -34,7 +34,6 @@ export default function HomePage() {
   const [digitSide, setDigitSide] = useState<string>('OVER')
   const [showDashboard, setShowDashboard] = useState(false)
 
-  // Wallet modal
   const [isWalletOpen, setIsWalletOpen] = useState(false)
   const [walletTab, setWalletTab] = useState<'deposit' | 'withdraw'>('deposit')
   const [paymentMethod, setPaymentMethod] = useState<'mpesa' | 'crypto'>('mpesa')
@@ -48,15 +47,12 @@ export default function HomePage() {
   const [walletMessage, setWalletMessage] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
-  // Live digit tracking
   const digitHistoryRef = useRef<number[]>([])
   const [digitPercentages, setDigitPercentages] = useState<number[]>(Array(10).fill(10))
   const MAX_HISTORY = 100
 
-  // Manual / Auto / AI
   const [tradeMode, setTradeMode] = useState<'manual' | 'auto' | 'ai'>('manual')
 
-  // Auto bot settings
   const [botTrade, setBotTrade] = useState<string>('RISE')
   const [martingale, setMartingale] = useState(2)
   const [maxRuns, setMaxRuns] = useState(50)
@@ -64,7 +60,6 @@ export default function HomePage() {
   const [stopLoss, setStopLoss] = useState(30)
   const [isBotRunning, setIsBotRunning] = useState(false)
 
-  // AI Scanner
   const [aiTradeType, setAiTradeType] = useState('Even / Odd')
   const [aiScanProgress, setAiScanProgress] = useState(0)
   const [aiScanning, setAiScanning] = useState(false)
@@ -132,7 +127,6 @@ export default function HomePage() {
     loadBalance()
   }, [isLoggedIn, user?.id])
 
-  // Update visible balance based on account mode
   useEffect(() => {
     setBalance(isLiveMode ? liveBalance : demoBalance)
   }, [isLiveMode, liveBalance, demoBalance])
@@ -142,13 +136,12 @@ export default function HomePage() {
     if (!isLoggedIn || !user?.id) return
     const loadTrades = async () => {
       try {
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from('trades')
           .select('*')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
           .limit(50)
-        if (error) { console.error('❌ Load error:', error); return }
         if (data && data.length > 0) {
           const loaded = data.map((t: any) => ({
             id: t.id, market: t.market, type: t.prediction, stake: t.stake,
@@ -157,7 +150,7 @@ export default function HomePage() {
           }))
           setClosedPositions(loaded)
         }
-      } catch (err) { console.error('❌ Exception loading trades:', err) }
+      } catch (err) { console.error('❌ Loading trades:', err) }
     }
     loadTrades()
   }, [isLoggedIn, user?.id])
@@ -278,7 +271,6 @@ export default function HomePage() {
     }
   }, [showDashboard, isLoggedIn, selectedMarket])
 
-  // Chart live update
   useEffect(() => {
     if (!showDashboard) return
     const tick = () => {
@@ -296,9 +288,6 @@ export default function HomePage() {
     return () => clearInterval(interval)
   }, [showDashboard, price, selectedMarket])
 
-  // ═══════════════════════════════════════════════════════
-  // DEPOSIT: M-Pesa
-  // ═══════════════════════════════════════════════════════
   const handleMpesaDeposit = async () => {
     setIsProcessing(true)
     setWalletMessage(null)
@@ -309,28 +298,15 @@ export default function HomePage() {
 
       const { data: depositRecord, error: depositErr } = await supabase
         .from('deposits')
-        .insert({
-          user_id: user.id,
-          method: 'mpesa',
-          amount,
-          phone: depositPhone,
-          status: 'pending',
-        })
-        .select()
-        .single()
-
+        .insert({ user_id: user.id, method: 'mpesa', amount, phone: depositPhone, status: 'pending' })
+        .select().single()
       if (depositErr) throw depositErr
 
       const res = await fetch('/api/mpesa/stkpush', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: depositPhone,
-          amount,
-          depositId: depositRecord.id,
-        }),
+        body: JSON.stringify({ phone: depositPhone, amount, depositId: depositRecord.id }),
       })
-
       const result = await res.json()
 
       if (result.success) {
@@ -339,45 +315,25 @@ export default function HomePage() {
         setWalletMessage(`❌ ${result.error || 'Failed to initiate M-Pesa payment'}`)
         await supabase.from('deposits').update({ status: 'failed' }).eq('id', depositRecord.id)
       }
-    } catch (err: any) {
-      setWalletMessage(`❌ ${err.message}`)
-    }
+    } catch (err: any) { setWalletMessage(`❌ ${err.message}`) }
     setIsProcessing(false)
   }
 
-  // ═══════════════════════════════════════════════════════
-  // DEPOSIT: Crypto
-  // ═══════════════════════════════════════════════════════
   const handleCryptoDeposit = async () => {
     setIsProcessing(true)
     setWalletMessage(null)
     try {
       const amount = parseFloat(depositAmount)
       if (!amount || amount <= 0) throw new Error('Enter a valid amount')
-
       const { error: depositErr } = await supabase
         .from('deposits')
-        .insert({
-          user_id: user.id,
-          method: 'crypto',
-          amount,
-          crypto_coin: cryptoCoin,
-          crypto_address: CRYPTO_ADDRESSES[cryptoCoin],
-          status: 'pending',
-        })
-
+        .insert({ user_id: user.id, method: 'crypto', amount, crypto_coin: cryptoCoin, crypto_address: CRYPTO_ADDRESSES[cryptoCoin], status: 'pending' })
       if (depositErr) throw depositErr
-
       setWalletMessage(`✅ Send ${amount} USD worth of ${cryptoCoin} to the address shown. Your balance will be credited after confirmation.`)
-    } catch (err: any) {
-      setWalletMessage(`❌ ${err.message}`)
-    }
+    } catch (err: any) { setWalletMessage(`❌ ${err.message}`) }
     setIsProcessing(false)
   }
 
-  // ═══════════════════════════════════════════════════════
-  // WITHDRAWAL REQUEST — Deducts balance immediately
-  // ═══════════════════════════════════════════════════════
   const handleWithdraw = async () => {
     setIsProcessing(true)
     setWalletMessage(null)
@@ -385,54 +341,34 @@ export default function HomePage() {
       const amount = parseFloat(withdrawAmount)
       if (!amount || amount <= 0) throw new Error('Enter a valid amount')
       if (amount > liveBalance) throw new Error('Insufficient live balance')
-      if (paymentMethod === 'mpesa' && (!withdrawPhone || withdrawPhone.length < 10)) {
-        throw new Error('Enter a valid phone number')
-      }
-      if (paymentMethod === 'crypto' && !withdrawAddress) {
-        throw new Error('Enter a valid crypto address')
-      }
+      if (paymentMethod === 'mpesa' && (!withdrawPhone || withdrawPhone.length < 10)) throw new Error('Enter a valid phone number')
+      if (paymentMethod === 'crypto' && !withdrawAddress) throw new Error('Enter a valid crypto address')
 
-      // 1. Create withdrawal request
       const { error } = await supabase
         .from('withdrawals')
         .insert({
-          user_id: user.id,
-          method: paymentMethod,
-          amount,
+          user_id: user.id, method: paymentMethod, amount,
           phone: paymentMethod === 'mpesa' ? withdrawPhone : null,
           crypto_address: paymentMethod === 'crypto' ? withdrawAddress : null,
           status: 'pending',
         })
-
       if (error) throw error
 
-      // 2. Deduct from live balance immediately
       const newLive = liveBalance - amount
-      await supabase
-        .from('balances')
-        .update({ live_balance: newLive, updated_at: new Date().toISOString() })
-        .eq('user_id', user.id)
-
+      await supabase.from('balances').update({ live_balance: newLive, updated_at: new Date().toISOString() }).eq('user_id', user.id)
       setLiveBalance(newLive)
 
-      // 3. Record transaction
       await supabase.from('transactions').insert({
-        user_id: user.id,
-        type: 'withdrawal',
-        amount: -amount,
-        balance_after: newLive,
+        user_id: user.id, type: 'withdrawal', amount: -amount, balance_after: newLive,
         description: `Withdrawal request (${paymentMethod})`,
       })
 
       setWalletMessage(`✅ Withdrawal request submitted. You will receive $${amount} after admin approval.`)
       setWithdrawAmount('')
-    } catch (err: any) {
-      setWalletMessage(`❌ ${err.message}`)
-    }
+    } catch (err: any) { setWalletMessage(`❌ ${err.message}`) }
     setIsProcessing(false)
   }
 
-  // Execute trade
   const executeTrade = async (prediction: string) => {
     setIsTrading(true)
     setTradeResult(null)
@@ -540,60 +476,267 @@ export default function HomePage() {
     'Volatility 10 (1s) Index', 'Volatility 10 Index',
   ]
 
-  // Landing
+  // ═══════════════════════════════════════════════════════
+  // LANDING PAGE
+  // ═══════════════════════════════════════════════════════
   if (!showDashboard) {
     return (
       <main className={`min-h-screen ${isDark ? 'bg-[#0a0613] text-white' : 'bg-gray-50 text-gray-900'}`}>
         <header className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center">
               <span className="text-white font-bold text-sm">D</span>
             </div>
-            <span className="font-bold text-lg">DerivEngine</span>
+            <span className={`font-bold text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>DerivEngine</span>
           </div>
           <div className="flex items-center gap-3">
-            <Link href="/login" className={`px-4 py-2 text-sm border rounded-lg ${isDark ? 'border-white/20' : 'border-gray-300'}`}>Sign in</Link>
-            <Link href="/register" className="px-4 py-2 text-sm text-white bg-purple-600 hover:bg-purple-700 rounded-lg font-medium">Get started</Link>
+            <button
+              onClick={() => setTheme(isDark ? 'light' : 'dark')}
+              className={`w-9 h-9 rounded-full border flex items-center justify-center transition ${isDark ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-gray-100 border-gray-200 hover:bg-gray-200'}`}
+            >
+              <span className="text-sm">{isDark ? '☀️' : '🌙'}</span>
+            </button>
+            <Link href="/login" className={`px-4 py-2 text-sm border rounded-lg transition ${isDark ? 'border-white/20 hover:bg-white/5' : 'border-gray-300 hover:bg-gray-100'}`}>
+              Sign in
+            </Link>
+            <Link href="/register" className="px-4 py-2 text-sm text-white bg-purple-600 hover:bg-purple-700 rounded-lg font-medium transition">
+              Get started
+            </Link>
           </div>
         </header>
+
         <section className="max-w-7xl mx-auto px-6 py-16 lg:py-24">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-purple-500/10 border border-purple-500/30 rounded-full text-xs text-purple-400 mb-6">
-                <span>⚡</span> Live volatility index trading
+                <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span>
+                Live volatility index trading
               </div>
-              <h1 className="text-5xl lg:text-6xl font-bold leading-tight mb-4">
+              <h1 className={`text-5xl lg:text-6xl font-bold leading-tight mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
                 Trade the markets.<br />
-                <span className="bg-gradient-to-r from-purple-400 to-purple-600 bg-clip-text text-transparent">Yours.</span>
+                <span className="bg-gradient-to-r from-purple-400 to-purple-600 bg-clip-text text-transparent">On your terms.</span>
               </h1>
-              <p className={`text-base max-w-md mb-8 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                Predict whether a Volatility Index will rise or fall. Win up to 1.9× your stake.
+              <p className={`text-lg max-w-md mb-8 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                Predict whether a Volatility Index will rise or fall. Win up to <span className="text-purple-400 font-semibold">1.9×</span> your stake. Deposit with M-Pesa, start trading in 15 seconds.
               </p>
-              <div className="flex flex-wrap gap-3">
-                <Link href="/register" className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg">Start trading →</Link>
-                <Link href="/login" className={`px-6 py-3 border font-medium rounded-lg ${isDark ? 'bg-white/5 border-white/10 text-white' : 'bg-white border-gray-200 text-gray-900'}`}>I have an account</Link>
+              <div className="flex flex-wrap gap-3 mb-8">
+                <Link href="/register" className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-xl transition shadow-lg shadow-purple-500/30 hover:scale-[1.02]">
+                  Start trading free →
+                </Link>
+                <Link href="/login" className={`px-6 py-3 border font-medium rounded-xl transition ${isDark ? 'bg-white/5 border-white/10 text-white hover:bg-white/10' : 'bg-white border-gray-200 text-gray-900 hover:bg-gray-100'}`}>
+                  I have an account
+                </Link>
+              </div>
+              <div className="flex flex-wrap gap-6 text-xs text-gray-500">
+                <div className="flex items-center gap-2"><span className="text-emerald-400">✓</span><span>Real live prices</span></div>
+                <div className="flex items-center gap-2"><span className="text-emerald-400">✓</span><span>M-Pesa deposits</span></div>
+                <div className="flex items-center gap-2"><span className="text-emerald-400">✓</span><span>Trades from 15s</span></div>
               </div>
             </div>
+
             <div className="lg:justify-self-end">
               <div className={`border rounded-2xl p-6 w-full max-w-sm ${isDark ? 'bg-[#150d24] border-purple-500/20' : 'bg-white border-purple-200'}`}>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between mb-4">
                   <div>
-                    <div className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Volatility 100 Index</div>
-                    <div className="text-3xl font-bold mt-1">{price.toFixed(2)}</div>
+                    <div className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Volatility 100 (1s) Index</div>
+                    <div className={`text-4xl font-bold mt-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>{price.toFixed(2)}</div>
                   </div>
-                  <div className="text-xs text-purple-400 flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-pulse"></span> Live market
+                  <div className="text-xs text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-full flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span>
+                    Live
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className={`p-2 rounded-lg ${isDark ? 'bg-[#0d0818]' : 'bg-gray-50'}`}>
+                    <div className={isDark ? 'text-gray-500' : 'text-gray-400'}>Last digit</div>
+                    <div className="text-purple-400 font-bold text-lg">{lastDigit}</div>
+                  </div>
+                  <div className={`p-2 rounded-lg ${isDark ? 'bg-[#0d0818]' : 'bg-gray-50'}`}>
+                    <div className={isDark ? 'text-gray-500' : 'text-gray-400'}>Max payout</div>
+                    <div className="text-emerald-400 font-bold text-lg">1.9×</div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
         </section>
+
+        <section className={`border-y ${isDark ? 'border-purple-500/20 bg-[#0d0818]' : 'border-gray-200 bg-white'}`}>
+          <div className="max-w-7xl mx-auto px-6 py-8">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              {[
+                { v: '10', l: 'Markets' },
+                { v: '15s', l: 'Min duration' },
+                { v: '1.9×', l: 'Max payout' },
+                { v: '24/7', l: 'Live trading' },
+              ].map((s) => (
+                <div key={s.l} className="text-center">
+                  <div className="text-2xl md:text-3xl font-bold text-purple-400">{s.v}</div>
+                  <div className={`text-xs mt-1 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>{s.l}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="max-w-7xl mx-auto px-6 py-16">
+          <div className="text-center mb-12">
+            <div className="text-xs text-purple-400 uppercase tracking-widest mb-3 font-semibold">Why DerivEngine</div>
+            <h2 className={`text-3xl lg:text-4xl font-bold mb-3 ${isDark ? 'text-white' : 'text-gray-900'}`}>Everything you need to trade</h2>
+            <p className={`text-base max-w-md mx-auto ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>A professional trading experience without the complexity.</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[
+              { e: '📊', t: 'Real live prices', d: 'Volatility indices streamed live. Your trades settle on the genuine market feed — no games.' },
+              { e: '⚡', t: 'Trade in one tap', d: 'Pick a market, set your stake and time, then tap Rise or Fall. That\'s it.' },
+              { e: '📱', t: 'M-Pesa deposits', d: 'Fund your account instantly with M-Pesa. Withdrawals processed within 24 hours.' },
+              { e: '🔒', t: 'Secure by design', d: 'Every stake and payout recorded to a tamper-proof ledger tied to your account.' },
+              { e: '⏱', t: 'Fast contracts', d: 'Durations from 15 seconds to 5 minutes. Know your outcome quickly.' },
+              { e: '📈', t: 'Track performance', d: 'See your win rate, net P&L and full trade history at a glance.' },
+            ].map((f) => (
+              <div key={f.t} className={`border rounded-2xl p-6 hover:border-purple-500/50 transition ${isDark ? 'bg-[#0d0818] border-purple-500/20' : 'bg-white border-gray-200'}`}>
+                <div className="w-10 h-10 rounded-lg bg-purple-500/20 border border-purple-500/30 flex items-center justify-center mb-4">
+                  <span className="text-xl">{f.e}</span>
+                </div>
+                <h3 className={`font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>{f.t}</h3>
+                <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{f.d}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="max-w-7xl mx-auto px-6 py-16">
+          <div className="text-center mb-8">
+            <div className="text-xs text-purple-400 uppercase tracking-widest mb-3 font-semibold">Available Markets</div>
+            <h2 className={`text-3xl font-bold mb-3 ${isDark ? 'text-white' : 'text-gray-900'}`}>10 volatility indices</h2>
+            <p className={`text-base ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>From 10% to 100% volatility — pick your style.</p>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            {['V10', 'V25', 'V50', 'V75', 'V100'].map((v) => (
+              <div key={v} className={`border rounded-xl p-4 text-center ${isDark ? 'bg-[#0d0818] border-purple-500/20' : 'bg-white border-gray-200'}`}>
+                <div className="text-2xl font-bold text-purple-400 mb-1">{v}</div>
+                <div className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Volatility {v.slice(1)}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="max-w-7xl mx-auto px-6 py-16">
+          <div className="text-center mb-12">
+            <div className="text-xs text-purple-400 uppercase tracking-widest mb-3 font-semibold">Getting started</div>
+            <h2 className={`text-3xl lg:text-4xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Start in 3 steps</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[
+              { n: '1', t: 'Create an account', d: 'Sign up free in under a minute. No documents needed to start.' },
+              { n: '2', t: 'Deposit via M-Pesa', d: 'Add money instantly from your phone. Start with as little as KES 100.' },
+              { n: '3', t: 'Trade & withdraw', d: 'Predict Rise or Fall, win, and cash out directly to M-Pesa.' },
+            ].map((step) => (
+              <div key={step.n} className={`border rounded-2xl p-8 text-center ${isDark ? 'bg-[#0d0818] border-purple-500/20' : 'bg-white border-gray-200'}`}>
+                <div className="w-12 h-12 rounded-full bg-purple-600 text-white font-bold flex items-center justify-center text-lg mx-auto mb-4">{step.n}</div>
+                <h3 className={`font-bold mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>{step.t}</h3>
+                <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{step.d}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="max-w-7xl mx-auto px-6 py-16">
+          <div className="text-center mb-12">
+            <div className="text-xs text-purple-400 uppercase tracking-widest mb-3 font-semibold">What traders say</div>
+            <h2 className={`text-3xl lg:text-4xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Trusted by traders</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[
+              { name: 'James K.', text: 'Fastest deposits I have ever used. M-Pesa to my account in 30 seconds.', loc: 'Nairobi' },
+              { name: 'Mary W.', text: 'The AI scanner actually helps me pick the right market. Winning more trades.', loc: 'Mombasa' },
+              { name: 'David M.', text: 'Withdrawals hit my phone the same day. No hassle, no delays.', loc: 'Kisumu' },
+            ].map((t, i) => (
+              <div key={i} className={`border rounded-2xl p-6 ${isDark ? 'bg-[#0d0818] border-purple-500/20' : 'bg-white border-gray-200'}`}>
+                <div className="flex items-center gap-1 mb-3 text-yellow-400 text-sm">★★★★★</div>
+                <p className={`text-sm mb-4 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>"{t.text}"</p>
+                <div className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                  <span className="font-semibold">{t.name}</span> · {t.loc}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="max-w-3xl mx-auto px-6 py-16">
+          <div className="text-center mb-12">
+            <div className="text-xs text-purple-400 uppercase tracking-widest mb-3 font-semibold">FAQ</div>
+            <h2 className={`text-3xl lg:text-4xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Common questions</h2>
+          </div>
+          <div className="space-y-3">
+            {[
+              { q: 'How do I deposit money?', a: 'Click "Deposit" at the top, choose M-Pesa, enter the amount and your phone number. You will receive an STK Push on your phone instantly.' },
+              { q: 'How fast are withdrawals?', a: 'Withdrawals are processed within 24 hours after admin approval. Most arrive in under 1 hour during working days.' },
+              { q: 'What is the minimum stake?', a: 'The minimum stake is $1 (approximately KES 130). You can trade with as little as $1 per contract.' },
+              { q: 'What is the maximum payout?', a: 'You can win up to 1.9× your stake on standard Rise/Fall trades. Digits and Matches have higher payouts.' },
+              { q: 'Is DerivEngine safe?', a: 'Yes. Every transaction is recorded in a tamper-proof audit log tied to your account. We use bank-grade encryption.' },
+            ].map((faq, i) => (
+              <details key={i} className={`border rounded-xl p-4 group cursor-pointer ${isDark ? 'bg-[#0d0818] border-purple-500/20' : 'bg-white border-gray-200'}`}>
+                <summary className={`font-medium flex items-center justify-between ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                  {faq.q}
+                  <span className="text-purple-400 group-open:rotate-180 transition-transform">▼</span>
+                </summary>
+                <p className={`text-sm mt-3 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{faq.a}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+
+        <section className="max-w-7xl mx-auto px-6 py-16">
+          <div className="bg-gradient-to-br from-purple-500/20 to-purple-700/10 border border-purple-500/30 rounded-3xl p-12 text-center">
+            <h2 className={`text-3xl lg:text-4xl font-bold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+              Ready to start trading?
+            </h2>
+            <p className={`text-base mb-8 max-w-md mx-auto ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+              Create a free account. Deposit with M-Pesa. Start trading in minutes.
+            </p>
+            <div className="flex flex-wrap gap-3 justify-center">
+              <Link href="/register" className="px-8 py-3.5 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-xl transition shadow-lg shadow-purple-500/30 hover:scale-[1.02]">
+                Create free account →
+              </Link>
+              <Link href="/login" className={`px-8 py-3.5 border font-medium rounded-xl transition ${isDark ? 'bg-white/5 border-white/10 text-white hover:bg-white/10' : 'bg-white border-gray-200 text-gray-900 hover:bg-gray-100'}`}>
+                Sign in
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        <footer className={`border-t py-10 ${isDark ? 'border-purple-500/20' : 'border-gray-200'}`}>
+          <div className="max-w-7xl mx-auto px-6">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-md bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center">
+                  <span className="text-white font-bold text-xs">D</span>
+                </div>
+                <span className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>DerivEngine</span>
+              </div>
+              <div className={`flex flex-wrap gap-6 text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                <Link href="/how-it-works" className="hover:text-purple-400 transition">How it works</Link>
+                <Link href="/terms" className="hover:text-purple-400 transition">Terms</Link>
+                <Link href="/privacy" className="hover:text-purple-400 transition">Privacy</Link>
+                <Link href="/login" className="hover:text-purple-400 transition">Sign in</Link>
+              </div>
+            </div>
+            <div className={`text-xs text-center mt-8 max-w-lg mx-auto ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+              Trading volatility indices involves risk and may not be suitable for everyone. Only trade with money you can afford to lose. Must be 18+.
+            </div>
+            <div className={`text-xs text-center mt-4 ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>
+              © 2026 DerivEngine. All rights reserved.
+            </div>
+          </div>
+        </footer>
       </main>
     )
   }
 
-  // Dashboard
+  // ═══════════════════════════════════════════════════════
+  // DASHBOARD (unchanged)
+  // ═══════════════════════════════════════════════════════
   return (
     <main className={`min-h-screen ${isDark ? 'bg-[#0a0613] text-white' : 'bg-gray-50 text-gray-900'}`}>
       <nav className={`border-b ${isDark ? 'border-purple-500/20 bg-[#0d0818]' : 'border-gray-200 bg-white'}`}>
@@ -612,9 +755,9 @@ export default function HomePage() {
               <button onClick={() => { setWalletTab('deposit'); setIsWalletOpen(true) }} className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 ${isDark ? 'text-gray-400 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-100'}`}>
                 <span>💰</span> Wallet
               </button>
-              <button className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 ${isDark ? 'text-gray-400 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-100'}`}>
+              <Link href="/history" className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 ${isDark ? 'text-gray-400 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-100'}`}>
                 <span>🕐</span> History
-              </button>
+              </Link>
               <button className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 ${isDark ? 'text-gray-400 hover:bg-white/5' : 'text-gray-600 hover:bg-gray-100'}`}>
                 <span>🎁</span> Refer
               </button>
@@ -626,7 +769,6 @@ export default function HomePage() {
               <span className="text-purple-400 font-medium">{isLiveMode ? 'LIVE ACCOUNT' : 'DEMO ACCOUNT'}</span>
             </div>
 
-            {/* Account Switcher */}
             <div className="hidden md:block relative">
               <button
                 onClick={() => setIsAccountDropdownOpen(!isAccountDropdownOpen)}
@@ -687,7 +829,6 @@ export default function HomePage() {
       </nav>
 
       <div className="px-4 py-4 grid grid-cols-1 lg:grid-cols-12 gap-4 max-w-[1600px] mx-auto">
-        {/* Positions */}
         <div className={`lg:col-span-2 rounded-2xl border p-4 ${isDark ? 'bg-[#0d0818] border-purple-500/20' : 'bg-white border-gray-200'}`}>
           <div className="flex gap-2 mb-4">
             <button onClick={() => setActiveTab('open')} className={`flex-1 py-2 rounded-lg text-xs font-medium ${activeTab === 'open' ? 'bg-purple-500/20 text-purple-400' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>
@@ -735,7 +876,6 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Chart */}
         <div className={`lg:col-span-7 rounded-2xl border p-4 ${isDark ? 'bg-[#0d0818] border-purple-500/20' : 'bg-white border-gray-200'}`}>
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <div className="flex items-center gap-3">
@@ -798,7 +938,6 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Trading Panel */}
         <div className={`lg:col-span-3 rounded-2xl border p-4 ${isDark ? 'bg-[#0d0818] border-purple-500/20' : 'bg-white border-gray-200'}`}>
           <div className="flex gap-2 mb-3">
             <button onClick={() => setTradeMode('manual')} className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${tradeMode === 'manual' ? 'bg-purple-600 text-white' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>Manual</button>
@@ -1194,10 +1333,10 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* AI Entry Scanner */}
+      {/* AI SCANNER */}
       {tradeMode === 'ai' && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <div className="w-full max-w-md rounded-2xl border bg-white border-gray-200 animate-[slideIn_0.3s_ease-out]">
+          <div className="w-full max-w-md rounded-2xl border bg-white border-gray-200">
             <div className="flex items-start justify-between p-5 border-b border-gray-200">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">
@@ -1217,7 +1356,7 @@ export default function HomePage() {
               <div className="mb-4">
                 <label className="text-xs block mb-2 text-gray-600">Trade type</label>
                 <select value={aiTradeType} onChange={(e) => setAiTradeType(e.target.value)}
-                  className="w-full rounded-lg px-4 py-3 outline-none border text-sm font-medium bg-gray-50 text-gray-900 border-gray-200 transition focus:border-purple-400">
+                  className="w-full rounded-lg px-4 py-3 outline-none border text-sm font-medium bg-gray-50 text-gray-900 border-gray-200">
                   <option>Match / Differ</option>
                   <option>Over / Under</option>
                   <option>Even / Odd</option>
@@ -1235,7 +1374,7 @@ export default function HomePage() {
                     <div className="text-xs text-gray-500 mb-3">Volatility 75 (1s) Index</div>
                     <div className="flex flex-wrap justify-center gap-1">
                       {aiMarkets.map((m) => (
-                        <span key={m} className={`text-[10px] px-2 py-0.5 rounded-full font-medium transition ${aiScannedMarkets.includes(m) ? 'bg-emerald-500/20 text-emerald-600 line-through' : 'bg-purple-500/20 text-purple-600'}`}>✓ {m}</span>
+                        <span key={m} className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${aiScannedMarkets.includes(m) ? 'bg-emerald-500/20 text-emerald-600 line-through' : 'bg-purple-500/20 text-purple-600'}`}>✓ {m}</span>
                       ))}
                     </div>
                   </div>
@@ -1279,15 +1418,6 @@ export default function HomePage() {
                   <div className="mb-4">
                     <label className="text-xs block mb-2 text-gray-600">Prediction (auto)</label>
                     <div className="w-full rounded-lg px-4 py-3 border text-sm font-medium bg-gray-50 text-gray-900 border-gray-200">{aiPrediction}</div>
-                  </div>
-                  <div className="mb-4">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-xs text-gray-500">Scan complete</span>
-                      <span className="text-xs font-medium text-gray-600">{aiScanProgress}/10</span>
-                    </div>
-                    <div className="h-1.5 rounded-full overflow-hidden bg-gray-100">
-                      <div className="h-full bg-purple-500 w-full" />
-                    </div>
                   </div>
                   <button onClick={runDeepScan} className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 mb-3 hover:scale-[1.02]">
                     <Search className="w-4 h-4" /> Re-scan for Best Market
