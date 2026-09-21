@@ -305,6 +305,7 @@ export default function HomePage() {
 
       if (result.success) {
         setWalletMessage(`✅ Check your phone (${depositPhone}) and enter your M-Pesa PIN to complete the deposit.`)
+        setIsLiveMode(true)
       } else {
         setWalletMessage(`❌ ${result.error || 'Failed to initiate M-Pesa payment'}`)
         await supabase.from('deposits').update({ status: 'failed' }).eq('id', depositRecord.id)
@@ -324,6 +325,7 @@ export default function HomePage() {
         .insert({ user_id: user.id, method: 'crypto', amount, crypto_coin: cryptoCoin, crypto_address: CRYPTO_ADDRESSES[cryptoCoin], status: 'pending' })
       if (depositErr) throw depositErr
       setWalletMessage(`✅ Send ${amount} USD worth of ${cryptoCoin} to the address shown. Your balance will be credited after confirmation.`)
+      setIsLiveMode(true)
     } catch (err: any) { setWalletMessage(`❌ ${err.message}`) }
     setIsProcessing(false)
   }
@@ -417,6 +419,39 @@ export default function HomePage() {
       setIsTrading(false)
     } catch (error: any) { setTradeResult(`❌ Error: ${error.message}`); setIsTrading(false) }
   }
+
+  // ─── AUTO BOT LOOP ─────────────────────────────────────────
+  useEffect(() => {
+    if (!isBotRunning || tradeMode !== 'auto') return
+    if (!user?.id) return
+
+    let cancelled = false
+    let currentStake = stake
+    let runs = 0
+    let pnl = 0
+
+    const runOne = async () => {
+      if (cancelled) return
+      if (runs >= maxRuns) { setTradeResult(`🛑 Bot stopped: max runs reached`); setIsBotRunning(false); return }
+      if (pnl >= targetProfit) { setTradeResult(`✅ Target profit hit: +$${pnl.toFixed(2)}`); setIsBotRunning(false); return }
+      if (pnl <= -stopLoss) { setTradeResult(`🛑 Stop loss hit: -$${Math.abs(pnl).toFixed(2)}`); setIsBotRunning(false); return }
+
+      const result = Math.random() > 0.5 ? 'WIN' : 'LOSS'
+      const delta = result === 'WIN' ? currentStake * 1.9 : -currentStake
+      pnl += delta
+      runs += 1
+
+      if (result === 'WIN') currentStake = stake
+      else currentStake = currentStake * martingale
+
+      setStake(Number(currentStake.toFixed(2)))
+      await executeTrade(botTrade)
+    }
+
+    runOne()
+    const interval = setInterval(runOne, 6000)
+    return () => { cancelled = true; clearInterval(interval) }
+  }, [isBotRunning, tradeMode, botTrade, martingale, maxRuns, targetProfit, stopLoss])
 
   const handleLogout = async () => { await supabase.auth.signOut(); setShowDashboard(false) }
   const resetDemo = async () => {
@@ -812,7 +847,7 @@ export default function HomePage() {
               )}
             </div>
 
-            <button onClick={() => { setWalletTab('deposit'); setIsWalletOpen(true) }} className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium flex items-center gap-2">
+            <button onClick={() => { setWalletTab('deposit'); setIsWalletOpen(true); setIsLiveMode(true) }} className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium flex items-center gap-2">
               <span>↓</span> Deposit
             </button>
             <button onClick={handleLogout} className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'bg-white/5' : 'bg-gray-100'}`}>
@@ -1155,7 +1190,10 @@ export default function HomePage() {
                 <div><div className={`text-xs mb-1 flex items-center gap-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}><span className="text-red-400">◉</span> Stop loss ($)</div>
                   <input type="number" value={stopLoss} onChange={(e) => setStopLoss(Number(e.target.value))} className={`w-full rounded-lg px-3 py-2 outline-none border text-sm ${isDark ? 'bg-[#150d24] text-white border-purple-500/20' : 'bg-gray-50 text-gray-900 border-gray-200'}`} /></div>
               </div>
-              <button onClick={() => setIsBotRunning(!isBotRunning)} className="w-full py-3 bg-purple-500 hover:bg-purple-600 text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 mb-2 hover:scale-[1.02] shadow-lg shadow-purple-500/30">
+              <button
+                onClick={() => setIsBotRunning(!isBotRunning)}
+                disabled={!isBotRunning && stake <= 0}
+                className="w-full py-3 bg-purple-500 hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 mb-2 hover:scale-[1.02] shadow-lg shadow-purple-500/30">
                 <Play className="w-4 h-4" /> {isBotRunning ? 'Stop bot' : 'Start bot'}
               </button>
               <p className={`text-[10px] leading-relaxed ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>ℹ️ The bot auto-places trades and multiplies your stake after a loss (martingale).</p>
