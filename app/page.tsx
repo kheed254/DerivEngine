@@ -321,12 +321,26 @@ export default function HomePage() {
     try {
       const amount = parseFloat(depositAmount)
       if (!amount || amount <= 0) throw new Error('Enter a valid amount')
+      if (!cryptoTxHash || cryptoTxHash.length < 10) throw new Error('Paste your transaction hash after sending crypto')
+
       const { error: depositErr } = await supabase
         .from('deposits')
-        .insert({ user_id: user.id, method: 'crypto', amount, crypto_coin: cryptoCoin, crypto_address: CRYPTO_ADDRESSES[cryptoCoin], status: 'pending' })
+        .insert({
+          user_id: user.id,
+          method: 'crypto',
+          amount,
+          crypto_coin: cryptoCoin,
+          crypto_address: CRYPTO_ADDRESSES[cryptoCoin],
+          crypto_tx_hash: cryptoTxHash,
+          status: 'pending',
+          target_account: 'live',
+        })
       if (depositErr) throw depositErr
-      setWalletMessage(`✅ Send ${amount} USD worth of ${cryptoCoin} to the address shown. Your balance will be credited after confirmation.`)
+
+      setWalletMessage(`✅ Deposit submitted. We'll verify TX ${cryptoTxHash.slice(0, 12)}... and credit your Live account within 24 hours.`)
       setIsLiveMode(true)
+      setCryptoTxHash('')
+      setDepositAmount('')
     } catch (err: any) { setWalletMessage(`❌ ${err.message}`) }
     setIsProcessing(false)
   }
@@ -1318,9 +1332,9 @@ export default function HomePage() {
                   )}
 
                   <button onClick={paymentMethod === 'mpesa' ? handleMpesaDeposit : handleCryptoDeposit}
-                    disabled={isProcessing || !depositAmount}
-                    className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-xl font-bold text-sm transition hover:scale-[1.02]">
-                    {isProcessing ? 'Processing...' : paymentMethod === 'mpesa' ? `Pay $${depositAmount || '0'} with M-Pesa` : `Deposit $${depositAmount || '0'} in ${cryptoCoin}`}
+                    disabled={isProcessing || !depositAmount || (paymentMethod === 'crypto' && !cryptoTxHash)}
+                    className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold text-sm transition hover:scale-[1.02]">
+                    {isProcessing ? 'Processing...' : paymentMethod === 'mpesa' ? `Pay $${depositAmount || '0'} with M-Pesa` : `Submit ${cryptoCoin} Deposit`}
                   </button>
                 </>
               )}
