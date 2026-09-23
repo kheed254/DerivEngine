@@ -40,6 +40,7 @@ export default function HomePage() {
   const [depositAmount, setDepositAmount] = useState('')
   const [depositPhone, setDepositPhone] = useState('')
   const [cryptoCoin, setCryptoCoin] = useState('USDT')
+  const [cryptoTxHash, setCryptoTxHash] = useState('')
   const [withdrawAmount, setWithdrawAmount] = useState('')
   const [withdrawPhone, setWithdrawPhone] = useState('')
   const [withdrawAddress, setWithdrawAddress] = useState('')
