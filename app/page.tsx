@@ -1300,6 +1300,14 @@ export default function HomePage() {
                           </button>
                         </div>
                       </div>
+                      <div className="mb-4">
+                        <label className={`text-xs block mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Transaction hash (after you send)</label>
+                        <input type="text" value={cryptoTxHash} onChange={(e) => setCryptoTxHash(e.target.value)} placeholder="Paste your TX hash here"
+                          className={`w-full rounded-lg px-4 py-3 outline-none border text-sm font-mono ${isDark ? 'bg-[#150d24] text-white border-purple-500/20 focus:border-purple-500/50' : 'bg-gray-50 text-gray-900 border-gray-200 focus:border-purple-400'}`} />
+                        <p className={`text-xs mt-2 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                          Send the crypto first, then paste the transaction hash. We'll verify it and credit your Live account within 24 hours.
+                        </p>
+                      </div>
                     </>
                   )}
 
