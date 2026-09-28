@@ -76,10 +76,18 @@ export default function HomePage() {
   const isDark = theme === 'dark'
   const aiMarkets = ['V10', 'V25', 'V50', 'V75', 'V100', 'V10 1s', 'V25 1s', 'V50 1s', 'V75 1s', 'V100 1s']
 
+  // ── YOUR REAL TRUST WALLET ADDRESSES ─────────────────────
   const CRYPTO_ADDRESSES: { [key: string]: string } = {
-    USDT: 'TQn9Y2khEsLJW1ChVWFMSMeRDow5KcbLSE',
-    BTC: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
-    ETH: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0',
+    USDT: 'TLgyntXK3BLu1WU9qpqvyX2ir5zUGQnb1L',
+    BTC: 'bc1qfvd367e86j2qvn2669p7hezlz582dphdmj5l7n',
+    ETH: '0x08A59F383a575427D08DB0957BFd6d184C4cA762',
+  }
+
+  // Networks each coin must be sent on
+  const CRYPTO_NETWORKS: { [key: string]: string } = {
+    USDT: 'TRON (TRC-20)',
+    BTC: 'Bitcoin',
+    ETH: 'Ethereum (ERC-20)',
   }
 
   const getOverMultiplier = (d: number) => ({ 0: 1.11, 1: 1.25, 2: 1.43, 3: 1.67, 4: 2.00, 5: 2.50, 6: 3.33, 7: 5.00, 8: 10.00 }[d] ?? 2.00)
@@ -1010,7 +1018,7 @@ export default function HomePage() {
           <div className="flex items-center gap-2 mb-3">
             <button onClick={() => setStake(Math.max(0, stake - 1))} className={`w-10 h-12 rounded-lg text-xl font-bold transition hover:scale-105 ${isDark ? 'bg-[#150d24] text-white' : 'bg-gray-100 text-gray-900'}`}>−</button>
             <input type="number" value={stake} onChange={(e) => setStake(Math.max(0, Number(e.target.value)))} min={0}
-              className={`flex-1 text-center text-xl font-bold rounded-lg py-3 outline-none border transition ${isDark ? 'bg-[#150d24] text-white border-purple-500/20 focus:border-purple-500/50' : 'bg-gray-50 text-gray-900 border-gray-200 focus:border-purple-400'}`} />
+              className={`flex-1 min-w-0 text-center text-xl font-bold rounded-lg py-3 outline-none border transition ${isDark ? 'bg-[#150d24] text-white border-purple-500/20 focus:border-purple-500/50' : 'bg-gray-50 text-gray-900 border-gray-200 focus:border-purple-400'}`} />
             <button onClick={() => setStake(stake + 1)} className={`w-10 h-12 rounded-lg text-xl font-bold transition hover:scale-105 ${isDark ? 'bg-[#150d24] text-white' : 'bg-gray-100 text-gray-900'}`}>+</button>
           </div>
 
@@ -1303,6 +1311,12 @@ export default function HomePage() {
                           ))}
                         </div>
                       </div>
+
+                      {/* Network warning */}
+                      <div className={`mb-3 p-2.5 rounded-lg text-xs border ${isDark ? 'bg-amber-500/10 border-amber-500/30 text-amber-300' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
+                        ⚠️ <b>Network: {CRYPTO_NETWORKS[cryptoCoin]}</b> — send only on this network or funds will be lost.
+                      </div>
+
                       <div className={`p-3 rounded-lg mb-4 ${isDark ? 'bg-[#150d24]' : 'bg-gray-50'}`}>
                         <div className={`text-xs mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Send {cryptoCoin} to:</div>
                         <div className="flex items-center gap-2">
@@ -1314,6 +1328,7 @@ export default function HomePage() {
                           </button>
                         </div>
                       </div>
+
                       <div className="mb-4">
                         <label className={`text-xs block mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Transaction hash (after you send)</label>
                         <input type="text" value={cryptoTxHash} onChange={(e) => setCryptoTxHash(e.target.value)} placeholder="Paste your TX hash here"
