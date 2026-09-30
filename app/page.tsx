@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { DerivClient } from '@/lib/derivClient'
-import { ChevronDown, LogOut, Clock, Zap, Play, X, Search, Sparkles, Copy, Check, Wallet, ArrowDownToLine, ArrowUpFromLine, TrendingUp, History, Gift, User } from 'lucide-react'
+import { ChevronDown, LogOut, Clock, Zap, Play, X, Search, Sparkles, Copy, Check, Wallet, ArrowDownToLine, ArrowUpFromLine, TrendingUp, History, Gift } from 'lucide-react'
 
 export default function HomePage() {
   const [price, setPrice] = useState(730.69)
@@ -34,6 +34,7 @@ export default function HomePage() {
   const [selectedDigit, setSelectedDigit] = useState<number>(5)
   const [digitSide, setDigitSide] = useState<string>('OVER')
   const [showDashboard, setShowDashboard] = useState(false)
+  const [digitTickCount, setDigitTickCount] = useState(0)  // for re-rendering tick counter
 
   const [isWalletOpen, setIsWalletOpen] = useState(false)
   const [walletTab, setWalletTab] = useState<'deposit' | 'withdraw'>('deposit')
@@ -88,7 +89,6 @@ export default function HomePage() {
     ETH: 'Ethereum (ERC-20)',
   }
 
-  // Price change %
   const priceChangePct = prevPrice ? ((price - prevPrice) / prevPrice) * 100 : 0
 
   const getOverMultiplier = (d: number) => ({ 0: 1.11, 1: 1.25, 2: 1.43, 3: 1.67, 4: 2.00, 5: 2.50, 6: 3.33, 7: 5.00, 8: 10.00 }[d] ?? 2.00)
@@ -110,6 +110,7 @@ export default function HomePage() {
     const total = arr.length || 1
     const pcts = counts.map((c) => Math.round((c / total) * 100))
     setDigitPercentages(pcts)
+    setDigitTickCount(arr.length)  // triggers re-render for the tick counter
   }
 
   const updatePrice = (newPrice: number) => {
@@ -178,41 +179,65 @@ export default function HomePage() {
     setLastDigit(Math.floor(base * 100) % 10)
     digitHistoryRef.current = []
     setDigitPercentages(Array(10).fill(10))
+    setDigitTickCount(0)
   }, [selectedMarket, showDashboard])
 
+  // ═══════════════════════════════════════════════════════════
+  // TICK FEED — fixed so fallback always runs even if Deriv hangs
+  // ═══════════════════════════════════════════════════════════
   useEffect(() => {
-    let derivClient: DerivClient
+    if (!showDashboard) return
+
+    let derivClient: DerivClient | null = null
     let isMounted = true
-    let fallbackInterval: NodeJS.Timeout
+    let derivConnected = false
+
+    // Start fallback FIRST — always works, no dependency on Deriv
+    const fallbackInterval = setInterval(() => {
+      if (!isMounted) return
+      if (derivConnected) return
+      setPrice((prev) => {
+        const next = Math.max(100, prev + (Math.random() - 0.5) * 2)
+        const d = Math.floor(next * 100) % 10
+        setLastDigit(d)
+        recordDigit(d)
+        setPrevPrice(prev)
+        return next
+      })
+    }, 1000)
+
+    // Try Deriv in background — do NOT block the fallback
     const connectDeriv = async () => {
       try {
         derivClient = new DerivClient()
         derivClient.setOnTick((newPrice: number) => {
           if (!isMounted) return
+          derivConnected = true
+          setIsDerivConnected(true)
           updatePrice(newPrice)
           const d = Math.floor(newPrice * 100) % 10
-          setLastDigit(d); recordDigit(d)
+          setLastDigit(d)
+          recordDigit(d)
         })
-        await derivClient.subscribeToTicks('1HZ100V')
+        // Timeout after 5s so a hanging subscribe doesn't block forever
+        await Promise.race([
+          derivClient.subscribeToTicks('1HZ100V'),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('deriv-timeout')), 5000)),
+        ])
         setIsDerivConnected(true)
-      } catch (error) { setIsDerivConnected(false) }
-      fallbackInterval = setInterval(() => {
-        if (!isMounted) return
-        setPrice((prev) => {
-          const next = Math.max(100, prev + (Math.random() - 0.5) * 2)
-          const d = Math.floor(next * 100) % 10
-          setLastDigit(d); recordDigit(d)
-          return next
-        })
-      }, 1000)
+      } catch (error) {
+        console.warn('Deriv connection failed, using fallback feed', error)
+        setIsDerivConnected(false)
+      }
     }
     connectDeriv()
+
     return () => {
       isMounted = false
-      if (fallbackInterval) clearInterval(fallbackInterval)
+      clearInterval(fallbackInterval)
       if (derivClient) derivClient.unsubscribeFromTicks()
     }
-  }, [])
+  }, [showDashboard, selectedMarket])
 
   useEffect(() => {
     if (!showDashboard) return
@@ -496,9 +521,6 @@ export default function HomePage() {
     'Volatility 10 (1s) Index', 'Volatility 10 Index',
   ]
 
-  // ═══════════════════════════════════════════════════════
-  // LANDING PAGE (unchanged)
-  // ═══════════════════════════════════════════════════════
   if (!showDashboard) {
     return (
       <main className="min-h-screen bg-gray-50 text-gray-900">
@@ -516,27 +538,21 @@ export default function HomePage() {
         </header>
         <section className="max-w-7xl mx-auto px-6 py-16 lg:py-24 text-center">
           <h1 className="text-4xl lg:text-6xl font-bold mb-4">Trade the markets. On your terms.</h1>
-          <p className="text-lg mb-8 text-gray-600 max-w-xl mx-auto">
-            Predict Volatility Index movements. Win up to 1.9× your stake.
-          </p>
+          <p className="text-lg mb-8 text-gray-600 max-w-xl mx-auto">Predict Volatility Index movements. Win up to 1.9× your stake.</p>
           <Link href="/register" className="inline-block px-8 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-xl">Start trading free →</Link>
         </section>
       </main>
     )
   }
 
-  // ═══════════════════════════════════════════════════════
-  // DASHBOARD — new mobile-first design
-  // ═══════════════════════════════════════════════════════
   const kesAmount = (stake * 130).toLocaleString()
 
   return (
     <main className={`min-h-screen pb-20 md:pb-0 ${isDark ? 'bg-[#0a0613] text-white' : 'bg-gray-50 text-gray-900'}`}>
 
-      {/* ── TOP BAR (mobile-first) ───────────────────── */}
+      {/* ── TOP BAR ───────────────────────────── */}
       <nav className={`border-b sticky top-0 z-30 ${isDark ? 'border-purple-500/20 bg-[#0d0818]' : 'border-gray-200 bg-white'}`}>
         <div className="px-4 md:px-6 py-3 flex items-center justify-between gap-3">
-          {/* Logo */}
           <div className="flex items-center gap-2 flex-shrink-0">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center">
               <span className="text-white font-bold text-sm">D</span>
@@ -544,7 +560,6 @@ export default function HomePage() {
             <span className="font-bold hidden sm:inline">DerivEngine</span>
           </div>
 
-          {/* Account pill — clickable to switch */}
           <div className="relative flex-1 flex justify-center md:flex-none md:justify-start">
             <button
               onClick={() => setIsAccountDropdownOpen(!isAccountDropdownOpen)}
@@ -598,11 +613,10 @@ export default function HomePage() {
             )}
           </div>
 
-          {/* Right side actions */}
           <div className="flex items-center gap-2 flex-shrink-0">
             <button
               onClick={() => { setWalletTab('withdraw'); setIsWalletOpen(true) }}
-              className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border ${isDark ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-gray-100 border-gray-200 hover:bg-gray-200'}`}
+              className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border ${isDark ? 'bg-white/5 border-white/10' : 'bg-gray-100 border-gray-200'}`}
             >
               <ArrowUpFromLine className="w-3.5 h-3.5" /> Withdraw
             </button>
@@ -612,10 +626,7 @@ export default function HomePage() {
             >
               <ArrowDownToLine className="w-3.5 h-3.5" /> Deposit
             </button>
-            <button onClick={handleLogout} className={`w-8 h-8 rounded-lg flex items-center justify-center md:hidden ${isDark ? 'bg-white/5' : 'bg-gray-100'}`}>
-              <LogOut className="w-4 h-4 text-gray-400" />
-            </button>
-            <button onClick={handleLogout} className={`hidden md:flex w-8 h-8 rounded-lg items-center justify-center ${isDark ? 'bg-white/5' : 'bg-gray-100'}`}>
+            <button onClick={handleLogout} className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'bg-white/5' : 'bg-gray-100'}`}>
               <LogOut className="w-4 h-4 text-gray-400" />
             </button>
           </div>
@@ -624,15 +635,10 @@ export default function HomePage() {
 
       <div className="px-3 md:px-4 py-3 md:py-4 grid grid-cols-1 lg:grid-cols-12 gap-3 md:gap-4 max-w-[1600px] mx-auto">
 
-        {/* Positions panel — desktop only */}
         <div className={`hidden lg:block lg:col-span-2 rounded-2xl border p-4 ${isDark ? 'bg-[#0d0818] border-purple-500/20' : 'bg-white border-gray-200'}`}>
           <div className="flex gap-2 mb-4">
-            <button onClick={() => setActiveTab('open')} className={`flex-1 py-2 rounded-lg text-xs font-medium ${activeTab === 'open' ? 'bg-purple-500/20 text-purple-500' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              Open ({openPositions.length})
-            </button>
-            <button onClick={() => setActiveTab('closed')} className={`flex-1 py-2 rounded-lg text-xs font-medium ${activeTab === 'closed' ? 'bg-purple-500/20 text-purple-500' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              Closed ({closedPositions.length})
-            </button>
+            <button onClick={() => setActiveTab('open')} className={`flex-1 py-2 rounded-lg text-xs font-medium ${activeTab === 'open' ? 'bg-purple-500/20 text-purple-500' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>Open ({openPositions.length})</button>
+            <button onClick={() => setActiveTab('closed')} className={`flex-1 py-2 rounded-lg text-xs font-medium ${activeTab === 'closed' ? 'bg-purple-500/20 text-purple-500' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>Closed ({closedPositions.length})</button>
           </div>
           <div className={`text-center py-12 text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
             {activeTab === 'open' && openPositions.length === 0 && <div>No open positions yet.</div>}
@@ -640,7 +646,6 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Main trading panel */}
         <div className="lg:col-span-7 space-y-3">
 
           {/* Market header */}
@@ -668,8 +673,6 @@ export default function HomePage() {
                 </div>
               </div>
             </div>
-
-            {/* Chart */}
             <div ref={chartRef} className="w-full mt-3 rounded-lg overflow-hidden" style={{ height: '220px' }} />
           </div>
 
@@ -678,7 +681,9 @@ export default function HomePage() {
             <div className="flex justify-between items-center mb-3">
               <div className={`text-xs font-bold tracking-wide ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                 <span className="text-purple-500">#</span> LIVE LAST DIGITS
-                <span className={`ml-2 text-[10px] font-normal ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>({digitHistoryRef.current.length || 0} ticks)</span>
+                <span className={`ml-2 text-[10px] font-normal ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                  (last {digitTickCount} ticks)
+                </span>
               </div>
             </div>
             <div className="grid grid-cols-10 gap-0.5 md:gap-1">
@@ -712,15 +717,12 @@ export default function HomePage() {
 
           {/* Trade panel */}
           <div className={`rounded-2xl border p-3 md:p-4 ${isDark ? 'bg-[#0d0818] border-purple-500/20' : 'bg-white border-gray-200'}`}>
-
-            {/* Mode selector */}
             <div className={`grid grid-cols-3 gap-1 p-1 rounded-xl mb-3 ${isDark ? 'bg-[#150d24]' : 'bg-gray-100'}`}>
               <button onClick={() => setTradeMode('manual')} className={`py-2 rounded-lg text-xs md:text-sm font-semibold transition ${tradeMode === 'manual' ? 'bg-purple-600 text-white shadow' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>Manual</button>
               <button onClick={() => setTradeMode('auto')} className={`py-2 rounded-lg text-xs md:text-sm font-semibold transition ${tradeMode === 'auto' ? 'bg-purple-600 text-white shadow' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>Auto</button>
               <button onClick={() => setTradeMode('ai')} className={`py-2 rounded-lg text-xs md:text-sm font-semibold transition flex items-center justify-center gap-1 ${tradeMode === 'ai' ? 'bg-purple-600 text-white shadow' : isDark ? 'text-gray-400' : 'text-gray-600'}`}>✨ AI</button>
             </div>
 
-            {/* Trade type pills */}
             <div className="grid grid-cols-3 gap-2 mb-3">
               <button onClick={() => setTradeType('rise-fall')} className={`py-2.5 rounded-xl text-xs md:text-sm font-semibold border transition ${tradeType === 'rise-fall' ? 'bg-purple-600 text-white border-purple-600' : (isDark ? 'bg-[#150d24] text-gray-300 border-purple-500/20' : 'bg-white text-gray-700 border-gray-200')}`}>Rise/Fall</button>
               <button onClick={() => setTradeType('digits')} className={`py-2.5 rounded-xl text-xs md:text-sm font-semibold border transition ${tradeType === 'digits' ? 'bg-purple-600 text-white border-purple-600' : (isDark ? 'bg-[#150d24] text-gray-300 border-purple-500/20' : 'bg-white text-gray-700 border-gray-200')}`}>Digits</button>
@@ -729,7 +731,6 @@ export default function HomePage() {
               )}
             </div>
 
-            {/* Stake input */}
             <div className="flex justify-between items-center mb-2">
               <span className={`text-xs md:text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Stake (USD)</span>
               <div className="flex items-center gap-2">
@@ -750,7 +751,6 @@ export default function HomePage() {
             </div>
             <div className={`text-right text-[11px] mb-3 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>≈ KES {kesAmount}</div>
 
-            {/* Quick amounts */}
             <div className="grid grid-cols-6 gap-1.5 mb-4">
               {[1, 5, 10, 25, 50, 100].map((val) => (
                 <button key={val} onClick={() => setStake(val)}
@@ -760,7 +760,6 @@ export default function HomePage() {
               ))}
             </div>
 
-            {/* Manual — Rise/Fall */}
             {tradeMode === 'manual' && tradeType === 'rise-fall' && (
               <>
                 <div className="mb-3">
@@ -788,7 +787,6 @@ export default function HomePage() {
               </>
             )}
 
-            {/* Manual — Digits */}
             {tradeMode === 'manual' && tradeType === 'digits' && (
               <>
                 <div className="grid grid-cols-3 gap-2 mb-3">
@@ -844,7 +842,6 @@ export default function HomePage() {
               </>
             )}
 
-            {/* Manual — Multipliers */}
             {tradeMode === 'manual' && tradeType === 'multipliers' && (
               <>
                 <div className="mb-3">
@@ -868,7 +865,6 @@ export default function HomePage() {
               </>
             )}
 
-            {/* Auto mode */}
             {tradeMode === 'auto' && (
               <>
                 <div className="mb-3">
@@ -907,7 +903,6 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Right panel — desktop only extra */}
         <div className={`hidden lg:block lg:col-span-3 space-y-3`}>
           <div className={`rounded-2xl border p-4 ${isDark ? 'bg-[#0d0818] border-purple-500/20' : 'bg-white border-gray-200'}`}>
             <div className={`text-xs font-bold ${isDark ? 'text-gray-400' : 'text-gray-600'} mb-3`}>ACCOUNT</div>
@@ -917,7 +912,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* ── MOBILE BOTTOM NAV ─────────────────────── */}
+      {/* MOBILE BOTTOM NAV */}
       <div className={`fixed bottom-0 left-0 right-0 z-30 border-t md:hidden ${isDark ? 'bg-[#0d0818] border-purple-500/20' : 'bg-white border-gray-200'}`}>
         <div className="grid grid-cols-5 py-2">
           <button className="flex flex-col items-center gap-0.5 py-1 text-purple-600">
@@ -943,7 +938,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* WALLET MODAL — unchanged content */}
+      {/* WALLET MODAL */}
       {isWalletOpen && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
           <div className={`w-full max-w-md rounded-2xl border ${isDark ? 'bg-[#0d0818] border-purple-500/20' : 'bg-white border-gray-200'} max-h-[90vh] overflow-y-auto`}>
