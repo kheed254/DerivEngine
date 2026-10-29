@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server'
+// app/api/mpesa/stkpush/route.ts
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseAdmin = createClient(
@@ -6,126 +7,130 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-const DARAJA_BASE = 'https://sandbox.safaricom.co.ke'
-const CONSUMER_KEY = process.env.MPESA_CONSUMER_KEY!
-const CONSUMER_SECRET = process.env.MPESA_CONSUMER_SECRET!
-const PASSKEY = process.env.MPESA_PASSKEY!
-const SHORTCODE = process.env.MPESA_SHORTCODE || '174379'
-const CALLBACK_URL = 'https://derivengine.vercel.app/api/mpesa/callback'
-
-async function getAccessToken(): Promise<string> {
-  const auth = Buffer.from(`${CONSUMER_KEY}:${CONSUMER_SECRET}`).toString('base64')
-  const res = await fetch(`${DARAJA_BASE}/oauth/v1/generate?grant_type=client_credentials`, {
-    method: 'GET',
-    headers: { Authorization: `Basic ${auth}` },
-  })
-  if (!res.ok) {
-    const err = await res.text()
-    throw new Error(`Safaricom auth failed: ${err}`)
-  }
-  const data = await res.json()
-  return data.access_token
+function getTimestamp() {
+  const d = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return (
+    d.getFullYear() +
+    pad(d.getMonth() + 1) +
+    pad(d.getDate()) +
+    pad(d.getHours()) +
+    pad(d.getMinutes()) +
+    pad(d.getSeconds())
+  )
 }
 
-async function sendSTKPush(phone: string, amount: number, accountRef: string) {
-  const token = await getAccessToken()
-  const now = new Date()
-  const timestamp =
-    now.getFullYear().toString() +
-    String(now.getMonth() + 1).padStart(2, '0') +
-    String(now.getDate()).padStart(2, '0') +
-    String(now.getHours()).padStart(2, '0') +
-    String(now.getMinutes()).padStart(2, '0') +
-    String(now.getSeconds()).padStart(2, '0')
-
-  const password = Buffer.from(`${SHORTCODE}${PASSKEY}${timestamp}`).toString('base64')
-
-  let formattedPhone = phone.replace(/\D/g, '')
-  if (formattedPhone.startsWith('0')) formattedPhone = '254' + formattedPhone.slice(1)
-  if (formattedPhone.startsWith('7')) formattedPhone = '254' + formattedPhone
-  if (formattedPhone.startsWith('1')) formattedPhone = '254' + formattedPhone
-
-  const body = {
-    BusinessShortCode: SHORTCODE,
-    Password: password,
-    Timestamp: timestamp,
-    TransactionType: 'CustomerPayBillOnline',
-    Amount: Math.ceil(amount),
-    PartyA: formattedPhone,
-    PartyB: SHORTCODE,
-    PhoneNumber: formattedPhone,
-    CallBackURL: CALLBACK_URL,
-    AccountReference: accountRef,
-    TransactionDesc: 'DerivEngine Deposit',
-  }
-
-  console.log('📡 Sending STK Push to', formattedPhone, 'for', amount)
-
-  const res = await fetch(`${DARAJA_BASE}/mpesa/stkpush/v1/processrequest`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  })
-
-  const data = await res.json()
-  console.log('📥 Safaricom response:', data)
-  return { ok: res.ok, data }
-}
-
-export async function POST(request: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const body = await request.json()
-    const { phone, amount, depositId } = body
+    const { phone, amount, depositId } = await req.json()
 
     if (!phone || !amount || !depositId) {
       return NextResponse.json(
-        { success: false, error: 'Missing required fields' },
+        { error: 'Missing phone, amount, or depositId' },
+        { status: 400 }
+      )
+    }
+
+    const numAmount = Number(amount)
+    if (!Number.isFinite(numAmount) || numAmount <= 0) {
+      return NextResponse.json({ error: 'Invalid amount' }, { status: 400 })
+    }
+
+    const { data: deposit, error: depErr } = await supabaseAdmin
+      .from('deposits')
+      .select('*')
+      .eq('id', depositId)
+      .single()
+
+    if (depErr || !deposit) {
+      return NextResponse.json({ error: 'Deposit record not found' }, { status: 404 })
+    }
+    if (deposit.status !== 'pending') {
+      return NextResponse.json({ error: 'Deposit already processed' }, { status: 400 })
+    }
+
+    let msisdn = String(phone).replace(/\D/g, '')
+    if (msisdn.startsWith('0')) msisdn = '254' + msisdn.slice(1)
+    if (msisdn.startsWith('7') || msisdn.startsWith('1')) msisdn = '254' + msisdn
+    if (!msisdn.startsWith('254') || msisdn.length !== 12) {
+      return NextResponse.json({ error: 'Invalid Kenyan phone number' }, { status: 400 })
+    }
+
+    const timestamp = getTimestamp()
+    const shortcode = process.env.MPESA_SHORTCODE!
+    const passkey = process.env.MPESA_PASSKEY!
+    const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64')
+
+    const auth = Buffer.from(
+      `${process.env.MPESA_CONSUMER_KEY}:${process.env.MPESA_CONSUMER_SECRET}`
+    ).toString('base64')
+
+    const tokenRes = await fetch(
+      'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials',
+      { headers: { Authorization: `Basic ${auth}` } }
+    )
+    const tokenData = await tokenRes.json()
+    if (!tokenData.access_token) {
+      console.error('Token error:', tokenData)
+      return NextResponse.json({ error: 'Failed to get M-Pesa access token' }, { status: 500 })
+    }
+
+    const callbackUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/mpesa/callback`
+
+    const stkBody = {
+      BusinessShortCode: shortcode,
+      Password: password,
+      Timestamp: timestamp,
+      TransactionType: 'CustomerPayBillOnline',
+      Amount: Math.round(numAmount),
+      PartyA: msisdn,
+      PartyB: shortcode,
+      PhoneNumber: msisdn,
+      CallBackURL: callbackUrl,
+      AccountReference: `DEP-${depositId.slice(0, 8)}`,
+      TransactionDesc: 'DerivEngine deposit',
+    }
+
+    const stkRes = await fetch(
+      'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokenData.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(stkBody),
+      }
+    )
+    const stkData = await stkRes.json()
+
+    if (stkData.ResponseCode !== '0') {
+      console.error('STK error:', stkData)
+      await supabaseAdmin
+        .from('deposits')
+        .update({ status: 'failed', mpesa_response: stkData })
+        .eq('id', depositId)
+      return NextResponse.json(
+        { error: stkData.errorMessage || stkData.ResponseDescription || 'STK push failed' },
         { status: 400 }
       )
     }
 
     await supabaseAdmin
       .from('deposits')
-      .update({ status: 'processing' })
-      .eq('id', depositId)
-
-    const { ok, data } = await sendSTKPush(phone, amount, `DEP-${depositId.slice(0, 8)}`)
-
-    if (!ok) {
-      await supabaseAdmin
-        .from('deposits')
-        .update({ status: 'failed' })
-        .eq('id', depositId)
-
-      return NextResponse.json({
-        success: false,
-        error: data.errorMessage || data.errorCode || 'STK Push failed',
-        raw: data,
-      })
-    }
-
-    await supabaseAdmin
-      .from('deposits')
       .update({
-        reference: data.CheckoutRequestID,
-        metadata: data,
+        status: 'processing',
+        mpesa_checkout_request_id: stkData.CheckoutRequestID,
+        mpesa_merchant_request_id: stkData.MerchantRequestID,
       })
       .eq('id', depositId)
 
     return NextResponse.json({
       success: true,
-      message: 'STK Push sent. Check your phone and enter M-Pesa PIN.',
-      checkoutRequestId: data.CheckoutRequestID,
-      customerMessage: data.CustomerMessage,
+      checkoutRequestId: stkData.CheckoutRequestID,
     })
-  } catch (error: any) {
-    console.error('❌ STK Push route error:', error)
-    return NextResponse.json(
-      { success: false, error: error.message || 'Internal server error' },
-      { status: 500 }
-    )
+  } catch (err: any) {
+    console.error('STK push error:', err)
+    return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 })
   }
 }

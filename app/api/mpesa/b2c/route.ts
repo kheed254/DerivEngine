@@ -13,9 +13,6 @@ const B2C_SHORTCODE = process.env.MPESA_B2C_SHORTCODE || '600000'
 const B2C_INITIATOR = process.env.MPESA_B2C_INITIATOR_NAME || 'testapi'
 const B2C_SECURITY_CRED = process.env.MPESA_B2C_SECURITY_CREDENTIAL || 'Safaricom999!*!'
 
-// ─────────────────────────────────────────────
-// Get OAuth token
-// ─────────────────────────────────────────────
 async function getAccessToken(): Promise<string> {
   const auth = Buffer.from(`${B2C_CONSUMER_KEY}:${B2C_CONSUMER_SECRET}`).toString('base64')
   const res = await fetch(`${DARAJA_BASE}/oauth/v1/generate?grant_type=client_credentials`, {
@@ -30,9 +27,6 @@ async function getAccessToken(): Promise<string> {
   return data.access_token
 }
 
-// ─────────────────────────────────────────────
-// Send B2C payout
-// ─────────────────────────────────────────────
 async function sendB2C(phone: string, amount: number, remarks: string) {
   const token = await getAccessToken()
 
@@ -70,9 +64,6 @@ async function sendB2C(phone: string, amount: number, remarks: string) {
   return { ok: res.ok, data }
 }
 
-// ─────────────────────────────────────────────
-// MAIN HANDLER
-// ─────────────────────────────────────────────
 export async function POST(request: Request) {
   try {
     const body = await request.json()
@@ -82,7 +73,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Missing withdrawalId' }, { status: 400 })
     }
 
-    // Fetch withdrawal
     const { data: wd, error } = await supabaseAdmin
       .from('withdrawals')
       .select('*')
@@ -101,7 +91,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Only M-Pesa withdrawals supported' }, { status: 400 })
     }
 
-    // Send B2C
     const { ok, data } = await sendB2C(wd.phone, wd.amount, `Payout ${withdrawalId.slice(0, 8)}`)
 
     if (!ok) {
@@ -112,7 +101,6 @@ export async function POST(request: Request) {
       })
     }
 
-    // Update status to paid + record reference
     await supabaseAdmin
       .from('withdrawals')
       .update({
@@ -122,7 +110,6 @@ export async function POST(request: Request) {
       })
       .eq('id', withdrawalId)
 
-    // Record in transactions
     await supabaseAdmin.from('transactions').insert({
       user_id: wd.user_id,
       type: 'withdrawal_paid',
