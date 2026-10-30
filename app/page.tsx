@@ -332,7 +332,7 @@ export default function HomePage() {
       if (depositErr) throw depositErr
 
       // 👇 THIS IS THE NEW PART: Calling Kotani Pay instead of Safaricom 👇
-      const res = await fetch('/api/kotani/onramp', {
+      const res = await fetch('/api/kotani/deposit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
