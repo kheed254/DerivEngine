@@ -33,29 +33,35 @@ export async function POST(req: NextRequest) {
     const customerKey = `cust_${userId}`
 
     // 1. Create the customer
-    const createRes = await fetch(`https://sandbox-api.kotanipay.com/api/v3/customer/mobile-money`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${process.env.KOTANI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        customer_key: customerKey,
-        phone_number: msisdn,
-        network: 'MPESA',
-        country_code: 'KE',
-      }),
-    })
+    let createData: any = null
+    try {
+      const createRes = await fetch(`https://sandbox-api.kotanipay.com/api/v3/customer/mobile-money`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${process.env.KOTANI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          customer_key: customerKey,
+          phone_number: msisdn,
+          network: 'MPESA',
+          country_code: 'KE',
+        }),
+      })
+      createData = await createRes.json()
 
-    const createData = await createRes.json()
+      const errorString = JSON.stringify(createData).toLowerCase()
+      const isAlreadyExists = errorString.includes('exist') || errorString.includes('duplicate')
 
-    // Better check for "already exists" error
-    const errorString = JSON.stringify(createData).toLowerCase()
-    const isAlreadyExists = errorString.includes('exist') || errorString.includes('duplicate')
-
-    if (!createRes.ok && !isAlreadyExists) {
-      console.error('Kotani Customer Creation Failed:', createData)
-      return NextResponse.json({ error: createData.message || createData.error || 'Failed to create customer' }, { status: 400 })
+      if (!createRes.ok && !isAlreadyExists) {
+        console.error('❌ Kotani Customer Creation Failed:', createData)
+        return NextResponse.json({ 
+          error: createData.message || createData.error || 'Failed to create customer. Check Vercel logs.' 
+        }, { status: 400 })
+      }
+    } catch (networkErr: any) {
+      console.error('❌ Customer creation network error:', networkErr)
+      return NextResponse.json({ error: 'Network error creating customer' }, { status: 500 })
     }
 
     // 2. Prepare the deposit payload
