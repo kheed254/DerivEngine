@@ -28,29 +28,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid Kenyan phone number' }, { status: 400 })
     }
 
-    // 👇 REPLACE THIS WITH THE WALLET ID YOU COPIED FROM KOTANI 👇
+    // 👇 REPLACE THIS WITH YOUR ACTUAL KES WALLET ID FROM KOTANI 👇
     const KOTANI_WALLET_ID = '6ae5010d87e1c813d2aada78'
 
-    // 1. First, create the customer in Kotani (or ignore error if they already exist)
-    const customerPayload = {
-      customer_key: `cust_${userId}`,
-      phone_number: msisdn,
-      network: 'MPESA',
-    }
-    
-    // (Note: If you have Secure Mode ON, you need to sign this request too. If not, this works.)
+    const customerKey = `cust_${userId}`
+
+    // 1. Create the customer (ignore error if they already exist)
     await fetch(`https://sandbox-api.kotanipay.com/api/v3/customers`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${process.env.KOTANI_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(customerPayload),
-    }).catch(() => {}) // Ignore error if customer already exists
+      body: JSON.stringify({
+        customer_key: customerKey,
+        phone_number: msisdn,
+        network: 'MPESA',
+      }),
+    }).catch(() => {})
 
-    // 2. Now, create the deposit (No phone_number here!)
+    // 2. Prepare the deposit payload (No phone_number here)
     const body = {
-      customer_key: `cust_${userId}`,
+      customer_key: customerKey,
       amount: numAmount,
       currency: 'KES',
       wallet_id: KOTANI_WALLET_ID,
@@ -67,6 +66,7 @@ export async function POST(req: NextRequest) {
       .update(payload)
       .digest('hex')
 
+    // 3. Make the deposit request
     const res = await fetch(`https://sandbox-api.kotanipay.com/api/v3/deposit/mobile-money`, {
       method: 'POST',
       headers: {
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: data.message || data.error || 'Deposit failed' }, { status: 400 })
     }
 
-    // Mark deposit as processing
+    // 4. Mark deposit as processing
     await supabaseAdmin
       .from('deposits')
       .update({
