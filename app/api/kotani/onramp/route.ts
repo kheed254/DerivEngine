@@ -1,4 +1,3 @@
-// app/api/kotani/onramp/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
@@ -28,8 +27,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid Kenyan phone number' }, { status: 400 })
     }
 
-    // Call Kotani Pay Onramp API
-    const res = await fetch(`${process.env.KOTANI_BASE_URL}/onramp`, {
+    // 👇 HARDCODED URL FIXES THE "undefined/onramp" ERROR 👇
+    const res = await fetch(`https://sandbox-api.kotanipay.com/onramp`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${process.env.KOTANI_API_KEY}`,
@@ -43,7 +42,8 @@ export async function POST(req: NextRequest) {
         receiverAddress: 'TLgyntXK3BLu1WU9qpqvyX2ir5zUGQnb1L', // Your Trust Wallet USDT address
         phoneNumber: msisdn,
         referenceId: depositId,
-        callbackUrl: `${process.env.NEXT_PUBLIC_APP_URL}/api/kotani/webhook`,
+        // 👇 HARDCODED VERCEL URL SO WEBHOOKS WORK 👇
+        callbackUrl: `https://derivengine.vercel.app/api/kotani/webhook`,
       }),
     })
 
