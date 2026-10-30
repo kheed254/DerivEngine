@@ -30,11 +30,10 @@ export async function POST(req: NextRequest) {
 
     // 👇 REPLACE THIS WITH YOUR ACTUAL KES WALLET ID FROM KOTANI 👇
     const KOTANI_WALLET_ID = '6ae5010d87e1c813d2aada78'
-
     const customerKey = `cust_${userId}`
 
-    // 1. Create the customer (ignore error if they already exist)
-    await fetch(`https://sandbox-api.kotanipay.com/api/v3/customers`, {
+    // 1. Try to create the customer
+    const createRes = await fetch(`https://sandbox-api.kotanipay.com/api/v3/customers`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${process.env.KOTANI_API_KEY}`,
@@ -45,9 +44,17 @@ export async function POST(req: NextRequest) {
         phone_number: msisdn,
         network: 'MPESA',
       }),
-    }).catch(() => {})
+    })
 
-    // 2. Prepare the deposit payload (No phone_number here)
+    const createData = await createRes.json()
+
+    // If the creation fails AND it's not because the customer already exists, then throw an error
+    if (!createRes.ok && !JSON.stringify(createData).toLowerCase().includes('exist')) {
+      console.error('Customer creation failed:', createData)
+      return NextResponse.json({ error: createData.message || 'Failed to create customer' }, { status: 400 })
+    }
+
+    // 2. Prepare the deposit payload
     const body = {
       customer_key: customerKey,
       amount: numAmount,
