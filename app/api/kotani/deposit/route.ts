@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     const KOTANI_WALLET_ID = '6ae5010d87e1c813d2aada78'
     const customerKey = `cust_${userId}`
 
-    // 1. Create the customer using the correct mobile-money endpoint
+    // 1. Create the customer
     const createRes = await fetch(`https://sandbox-api.kotanipay.com/api/v3/customer/mobile-money`, {
       method: 'POST',
       headers: {
@@ -43,6 +43,7 @@ export async function POST(req: NextRequest) {
         customer_key: customerKey,
         phone_number: msisdn,
         network: 'MPESA',
+        country_code: 'KE', // 👈 Added Country Code
       }),
     })
 
