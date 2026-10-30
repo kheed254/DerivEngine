@@ -27,8 +27,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid Kenyan phone number' }, { status: 400 })
     }
 
-    // 👇 HARDCODED URL FIXES THE "undefined/onramp" ERROR 👇
-    const res = await fetch(`https://sandbox-api.kotanipay.com/onramp`, {
+    // 👇 CORRECTED URL WITH /api/v3 👇
+    const res = await fetch(`https://sandbox-api.kotanipay.com/api/v3/onramp`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${process.env.KOTANI_API_KEY}`,
@@ -39,10 +39,9 @@ export async function POST(req: NextRequest) {
         currency: 'KES',
         chain: 'TRON',
         token: 'USDT',
-        receiverAddress: 'TLgyntXK3BLu1WU9qpqvyX2ir5zUGQnb1L', // Your Trust Wallet USDT address
+        receiverAddress: 'TLgyntXK3BLu1WU9qpqvyX2ir5zUGQnb1L',
         phoneNumber: msisdn,
         referenceId: depositId,
-        // 👇 HARDCODED VERCEL URL SO WEBHOOKS WORK 👇
         callbackUrl: `https://derivengine.vercel.app/api/kotani/webhook`,
       }),
     })
@@ -55,7 +54,7 @@ export async function POST(req: NextRequest) {
         .from('deposits')
         .update({ status: 'failed', mpesa_response: data })
         .eq('id', depositId)
-      return NextResponse.json({ error: data.message || 'Onramp failed' }, { status: 400 })
+      return NextResponse.json({ error: data.message || data.error || 'Onramp failed' }, { status: 400 })
     }
 
     // Mark deposit as processing
