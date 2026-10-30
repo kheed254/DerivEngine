@@ -32,8 +32,8 @@ export async function POST(req: NextRequest) {
     const KOTANI_WALLET_ID = '6ae5010d87e1c813d2aada78'
     const customerKey = `cust_${userId}`
 
-    // 1. Try to create the customer
-    const createRes = await fetch(`https://sandbox-api.kotanipay.com/api/v3/customers`, {
+    // 1. Create the customer using the correct mobile-money endpoint
+    const createRes = await fetch(`https://sandbox-api.kotanipay.com/api/v3/customer/mobile-money`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${process.env.KOTANI_API_KEY}`,
