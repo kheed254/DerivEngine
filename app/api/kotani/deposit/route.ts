@@ -43,16 +43,19 @@ export async function POST(req: NextRequest) {
         customer_key: customerKey,
         phone_number: msisdn,
         network: 'MPESA',
-        country_code: 'KE', // 👈 Added Country Code
+        country_code: 'KE',
       }),
     })
 
     const createData = await createRes.json()
 
-    // If the creation fails AND it's not because the customer already exists, then throw an error
-    if (!createRes.ok && !JSON.stringify(createData).toLowerCase().includes('exist')) {
-      console.error('Customer creation failed:', createData)
-      return NextResponse.json({ error: createData.message || 'Failed to create customer' }, { status: 400 })
+    // Better check for "already exists" error
+    const errorString = JSON.stringify(createData).toLowerCase()
+    const isAlreadyExists = errorString.includes('exist') || errorString.includes('duplicate')
+
+    if (!createRes.ok && !isAlreadyExists) {
+      console.error('Kotani Customer Creation Failed:', createData)
+      return NextResponse.json({ error: createData.message || createData.error || 'Failed to create customer' }, { status: 400 })
     }
 
     // 2. Prepare the deposit payload
