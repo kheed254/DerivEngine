@@ -31,12 +31,29 @@ export async function POST(req: NextRequest) {
     // 👇 REPLACE THIS WITH THE WALLET ID YOU COPIED FROM KOTANI 👇
     const KOTANI_WALLET_ID = '6ae5010d87e1c813d2aada78'
 
+    // 1. First, create the customer in Kotani (or ignore error if they already exist)
+    const customerPayload = {
+      customer_key: `cust_${userId}`,
+      phone_number: msisdn,
+      network: 'MPESA',
+    }
+    
+    // (Note: If you have Secure Mode ON, you need to sign this request too. If not, this works.)
+    await fetch(`https://sandbox-api.kotanipay.com/api/v3/customers`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.KOTANI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(customerPayload),
+    }).catch(() => {}) // Ignore error if customer already exists
+
+    // 2. Now, create the deposit (No phone_number here!)
     const body = {
       customer_key: `cust_${userId}`,
       amount: numAmount,
       currency: 'KES',
       wallet_id: KOTANI_WALLET_ID,
-      phone_number: msisdn,
       callback_url: `https://derivengine.vercel.app/api/kotani/webhook`,
       reference_id: depositId,
     }
