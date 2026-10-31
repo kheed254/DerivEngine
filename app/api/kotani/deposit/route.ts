@@ -32,36 +32,29 @@ export async function POST(req: NextRequest) {
     const KOTANI_WALLET_ID = '6ae5010d87e1c813d2aada78'
     const customerKey = `cust_${userId}`
 
-    // 1. Create the customer
-    let createData: any = null
-    try {
-      const createRes = await fetch(`https://sandbox-api.kotanipay.com/api/v3/customer/mobile-money`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${process.env.KOTANI_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          customer_key: customerKey,
-          phone_number: msisdn,
-          network: 'MPESA',
-          country_code: 'KE',
-        }),
-      })
-      createData = await createRes.json()
+    // 1. Create the customer (MUST SUCCEED)
+    const createRes = await fetch(`https://sandbox-api.kotanipay.com/api/v3/customer/mobile-money`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.KOTANI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        customer_key: customerKey,
+        phone_number: msisdn,
+        network: 'MPESA',
+        country_code: 'KE',
+      }),
+    })
 
-      const errorString = JSON.stringify(createData).toLowerCase()
-      const isAlreadyExists = errorString.includes('exist') || errorString.includes('duplicate')
+    const createData = await createRes.json()
 
-      if (!createRes.ok && !isAlreadyExists) {
-        console.error('❌ Kotani Customer Creation Failed:', createData)
-        return NextResponse.json({ 
-          error: createData.message || createData.error || 'Failed to create customer. Check Vercel logs.' 
-        }, { status: 400 })
-      }
-    } catch (networkErr: any) {
-      console.error('❌ Customer creation network error:', networkErr)
-      return NextResponse.json({ error: 'Network error creating customer' }, { status: 500 })
+    // If creation failed, STOP and log the real error. Do not proceed to deposit.
+    if (!createRes.ok) {
+      console.error('❌ Kotani Customer Creation Failed:', JSON.stringify(createData))
+      return NextResponse.json({ 
+        error: createData.message || 'Failed to create customer. Check Vercel logs.' 
+      }, { status: 400 })
     }
 
     // 2. Prepare the deposit payload
@@ -99,7 +92,7 @@ export async function POST(req: NextRequest) {
     const data = await res.json()
 
     if (!res.ok) {
-      console.error('Kotani deposit error:', data)
+      console.error('Kotani deposit error:', JSON.stringify(data))
       await supabaseAdmin
         .from('deposits')
         .update({ status: 'failed', mpesa_response: data })
