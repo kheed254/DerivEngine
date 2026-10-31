@@ -30,9 +30,8 @@ export async function POST(req: NextRequest) {
 
     // 👇 REPLACE THIS WITH YOUR ACTUAL KES WALLET ID FROM KOTANI 👇
     const KOTANI_WALLET_ID = '6ae5010d87e1c813d2aada78'
-    const customerKey = `cust_${userId}`
 
-    // 1. Create the customer (MUST SUCCEED)
+    // 1. Create the customer (Kotani generates the key, do NOT send customer_key)
     const createRes = await fetch(`https://sandbox-api.kotanipay.com/api/v3/customer/mobile-money`, {
       method: 'POST',
       headers: {
@@ -40,7 +39,6 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        customer_key: customerKey,
         phone_number: msisdn,
         network: 'MPESA',
         country_code: 'KE',
@@ -49,12 +47,18 @@ export async function POST(req: NextRequest) {
 
     const createData = await createRes.json()
 
-    // If creation failed, STOP and log the real error. Do not proceed to deposit.
     if (!createRes.ok) {
       console.error('❌ Kotani Customer Creation Failed:', JSON.stringify(createData))
       return NextResponse.json({ 
         error: createData.message || 'Failed to create customer. Check Vercel logs.' 
       }, { status: 400 })
+    }
+
+    // Get the customer_key returned by Kotani
+    const customerKey = createData.customer_key || createData.data?.customer_key || createData.id
+
+    if (!customerKey) {
+       return NextResponse.json({ error: 'Kotani did not return a customer key' }, { status: 500 })
     }
 
     // 2. Prepare the deposit payload
