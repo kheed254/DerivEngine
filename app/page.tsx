@@ -556,9 +556,20 @@ export default function HomePage() {
     'Volatility 10 (1s) Index', 'Volatility 10 Index',
   ]
 
-  // ═══════════════════════════════════════════════════════
-  // NEW LANDING PAGE
-  // ═══════════════════════════════════════════════════════
+  // 👇 NEW LOGIC: FIND MOST & LEAST APPEARING DIGITS 👇
+  let maxDigit = 0;
+  let maxPct = -1;
+  let minDigit = 0;
+  let minPct = 101;
+
+  if (digitTickCount >= 20) {
+    digitPercentages.forEach((pct, digit) => {
+      if (pct > maxPct) { maxPct = pct; maxDigit = digit; }
+      if (pct < minPct) { minPct = pct; minDigit = digit; }
+    });
+  }
+  // 👆 ---------------------------------------------- 👆
+
   if (!showDashboard) {
     return (
       <main className="min-h-screen bg-[#f8f9fc] text-gray-900 font-sans overflow-hidden">
@@ -575,7 +586,6 @@ export default function HomePage() {
           </div>
         </header>
 
-        {/* Hero Section */}
         <section className="relative max-w-7xl mx-auto px-6 pt-12 pb-24 lg:pt-20">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
@@ -608,9 +618,6 @@ export default function HomePage() {
     )
   }
 
-  // ═══════════════════════════════════════════════════════
-  // DASHBOARD
-  // ═══════════════════════════════════════════════════════
   const kesAmount = (stake * 130).toLocaleString()
   const userInitial = user?.email ? user.email[0].toUpperCase() : 'U'
 
@@ -732,10 +739,24 @@ export default function HomePage() {
 
           {/* Digits */}
           <div className="rounded-2xl border p-3 md:p-4 bg-[#0d0818] border-[#1f1433]">
-            <div className="flex justify-between items-center mb-3">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-3 gap-2">
               <div className="text-xs font-bold tracking-wide text-gray-400">
                 <span className="text-purple-500">#</span> LIVE LAST DIGITS
               </div>
+              
+              {/* 👇 SHOW MOST & LEAST APPEARING DIGITS 👇 */}
+              {digitTickCount >= 20 && (
+                <div className="flex gap-2 text-[10px] font-semibold">
+                  <span className="bg-emerald-500/10 text-emerald-500 px-2 py-1 rounded-md flex items-center gap-1">
+                    Most: {maxDigit} ({maxPct}%)
+                  </span>
+                  <span className="bg-red-500/10 text-red-500 px-2 py-1 rounded-md flex items-center gap-1">
+                    Least: {minDigit} ({minPct}%)
+                  </span>
+                </div>
+              )}
+              {/* 👆 ------------------------------------ 👆 */}
+
             </div>
             <div className="grid grid-cols-10 gap-0.5 md:gap-1">
               {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((digit) => {
@@ -889,7 +910,6 @@ export default function HomePage() {
               </>
             )}
 
-            {/* Show Not Enough Balance Warning */}
             {balance < stake && (
               <div className="mt-4 text-center text-sm text-red-500">
                 Not enough balance — <button onClick={() => { setWalletTab('deposit'); setIsWalletOpen(true); }} className="underline hover:text-red-400">deposit</button>
@@ -904,7 +924,6 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Sidebar Desktop */}
         <div className="hidden lg:block lg:col-span-3 space-y-3">
           <div className="rounded-2xl border p-4 bg-[#0d0818] border-[#1f1433]">
             <div className="text-xs font-bold text-gray-400 mb-3">ACCOUNT</div>
