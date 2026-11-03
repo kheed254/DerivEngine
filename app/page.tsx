@@ -100,16 +100,27 @@ export default function HomePage() {
   const overPercent = getOverPercent(selectedDigit)
   const underPercent = getUnderPercent(selectedDigit)
 
+  // 👇 FIX APPLIED HERE 👇
   const recordDigit = (d: number) => {
     const arr = digitHistoryRef.current
     arr.push(d)
     if (arr.length > MAX_HISTORY) arr.shift()
     digitHistoryRef.current = arr
+    
     const counts = Array(10).fill(0)
     arr.forEach((x) => { counts[x]++ })
     const total = arr.length || 1
-    const pcts = counts.map((c) => Math.round((c / total) * 100))
-    setDigitPercentages(pcts)
+
+    // Only calculate real percentages after we have at least 20 ticks
+    // This prevents the circles from jumping wildly when you first log in
+    if (arr.length >= 20) {
+      const pcts = counts.map((c) => Math.round((c / total) * 100))
+      setDigitPercentages(pcts)
+    } else {
+      // Keep them at 0% until we have enough data
+      setDigitPercentages(Array(10).fill(0))
+    }
+    
     setDigitTickCount(arr.length)
   }
 
@@ -190,7 +201,7 @@ export default function HomePage() {
     setPrice(base); setPrevPrice(base)
     setLastDigit(Math.floor(base * 100) % 10)
     digitHistoryRef.current = []
-    setDigitPercentages(Array(10).fill(10))
+    setDigitPercentages(Array(10).fill(0)) // Reset to 0%
     setDigitTickCount(0)
   }, [selectedMarket, showDashboard])
 
@@ -537,7 +548,7 @@ export default function HomePage() {
   ]
 
   // ═══════════════════════════════════════════════════════
-  // NEW LANDING PAGE (DerivEngine Branding)
+  // NEW LANDING PAGE
   // ═══════════════════════════════════════════════════════
   if (!showDashboard) {
     return (
@@ -566,7 +577,6 @@ export default function HomePage() {
 
         {/* HERO SECTION */}
         <section className="relative max-w-7xl mx-auto px-6 pt-12 pb-24 lg:pt-20">
-          {/* Background Decorative Gradients */}
           <div className="absolute top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
             <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[50%] rounded-full bg-purple-300/30 blur-[100px]" />
             <div className="absolute bottom-[20%] right-[10%] w-[30%] h-[40%] rounded-full bg-blue-300/20 blur-[100px]" />
@@ -599,9 +609,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Price Card */}
             <div className="relative lg:h-[400px] flex items-center justify-center">
-              {/* Decorative chart line */}
               <svg className="absolute inset-0 w-full h-full text-purple-200/50 -z-10" viewBox="0 0 100 100" preserveAspectRatio="none">
                 <path d="M0,80 Q10,70 20,75 T40,60 T60,70 T80,40 T100,50" fill="none" stroke="currentColor" strokeWidth="1" />
               </svg>
@@ -727,7 +735,7 @@ export default function HomePage() {
   }
 
   // ═══════════════════════════════════════════════════════
-  // DASHBOARD (Kept exactly the same as before)
+  // DASHBOARD
   // ═══════════════════════════════════════════════════════
   const kesAmount = (stake * 130).toLocaleString()
 
