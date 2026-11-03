@@ -100,7 +100,6 @@ export default function HomePage() {
   const overPercent = getOverPercent(selectedDigit)
   const underPercent = getUnderPercent(selectedDigit)
 
-  // 👇 FIX APPLIED HERE 👇
   const recordDigit = (d: number) => {
     const arr = digitHistoryRef.current
     arr.push(d)
@@ -111,13 +110,10 @@ export default function HomePage() {
     arr.forEach((x) => { counts[x]++ })
     const total = arr.length || 1
 
-    // Only calculate real percentages after we have at least 20 ticks
-    // This prevents the circles from jumping wildly when you first log in
     if (arr.length >= 20) {
       const pcts = counts.map((c) => Math.round((c / total) * 100))
       setDigitPercentages(pcts)
     } else {
-      // Keep them at 0% until we have enough data
       setDigitPercentages(Array(10).fill(0))
     }
     
@@ -201,7 +197,7 @@ export default function HomePage() {
     setPrice(base); setPrevPrice(base)
     setLastDigit(Math.floor(base * 100) % 10)
     digitHistoryRef.current = []
-    setDigitPercentages(Array(10).fill(0)) // Reset to 0%
+    setDigitPercentages(Array(10).fill(0))
     setDigitTickCount(0)
   }, [selectedMarket, showDashboard])
 
@@ -1100,6 +1096,24 @@ export default function HomePage() {
             <div className={`text-xs font-bold ${isDark ? 'text-gray-400' : 'text-gray-600'} mb-3`}>ACCOUNT</div>
             <div className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Balance</div>
             <div className="text-2xl font-bold text-purple-600">${balance.toFixed(2)}</div>
+          </div>
+          
+          <div className={`rounded-2xl border p-4 ${isDark ? 'bg-[#0d0818] border-purple-500/20' : 'bg-white border-gray-200'}`}>
+            <div className={`text-xs font-bold ${isDark ? 'text-gray-400' : 'text-gray-600'} mb-3`}>RECENT TRADES</div>
+            {closedPositions.length === 0 ? (
+              <div className={`text-xs text-center py-4 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>No trades yet</div>
+            ) : (
+              <div className="space-y-2">
+                {closedPositions.slice(0, 4).map((pos) => (
+                  <div key={pos.id} className="flex justify-between items-center text-xs">
+                    <span className={isDark ? 'text-gray-300' : 'text-gray-700'}>{pos.type}</span>
+                    <span className={pos.result === 'WIN' ? 'text-emerald-500 font-medium' : 'text-red-500 font-medium'}>
+                      {pos.result === 'WIN' ? '+' : ''}${pos.payout.toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
