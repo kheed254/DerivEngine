@@ -537,7 +537,7 @@ export default function HomePage() {
   ]
 
   // ═══════════════════════════════════════════════════════
-  // NEW LANDING PAGE (Matches the image provided)
+  // NEW LANDING PAGE (DerivEngine Branding)
   // ═══════════════════════════════════════════════════════
   if (!showDashboard) {
     return (
@@ -546,10 +546,10 @@ export default function HomePage() {
         {/* HEADER */}
         <header className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between relative z-10">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/30">
-              <span className="text-white font-bold text-sm italic">~</span>
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-lg shadow-purple-500/30">
+              <span className="text-white font-bold text-sm">D</span>
             </div>
-            <span className="font-bold text-xl tracking-tight text-gray-900">SinTrades</span>
+            <span className="font-bold text-xl tracking-tight text-gray-900">DerivEngine</span>
           </div>
           <div className="flex items-center gap-3">
             <button className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-300 transition">
@@ -705,10 +705,10 @@ export default function HomePage() {
         <footer className="bg-[#f8f9fc] border-t border-gray-200 py-12">
           <div className="max-w-7xl mx-auto px-6 text-center">
             <div className="flex items-center justify-center gap-2 mb-6">
-              <div className="w-6 h-6 rounded-full bg-purple-600 flex items-center justify-center">
-                <span className="text-white font-bold text-xs italic">~</span>
+              <div className="w-6 h-6 rounded-md bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center">
+                <span className="text-white font-bold text-xs">D</span>
               </div>
-              <span className="font-bold text-gray-900">SinTrades</span>
+              <span className="font-bold text-gray-900">DerivEngine</span>
             </div>
             <div className="flex flex-wrap justify-center gap-6 text-sm text-gray-500 mb-6">
               <Link href="#" className="hover:text-gray-900 transition">How it works</Link>
@@ -719,7 +719,7 @@ export default function HomePage() {
             <p className="text-xs text-gray-400 max-w-2xl mx-auto leading-relaxed">
               Trading volatility indices involves risk and may not be suitable for everyone. Only trade with money you can afford to lose. Prices are provided by the Deriv synthetic index feed.
             </p>
-            <p className="text-xs text-gray-400 mt-4">© 2026 SinTrades. All rights reserved.</p>
+            <p className="text-xs text-gray-400 mt-4">© 2026 DerivEngine. All rights reserved.</p>
           </div>
         </footer>
       </main>
