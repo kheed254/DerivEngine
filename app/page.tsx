@@ -556,10 +556,12 @@ export default function HomePage() {
     'Volatility 10 (1s) Index', 'Volatility 10 Index',
   ]
 
+  // ═══════════════════════════════════════════════════════
+  // NEW LANDING PAGE
+  // ═══════════════════════════════════════════════════════
   if (!showDashboard) {
     return (
       <main className="min-h-screen bg-[#f8f9fc] text-gray-900 font-sans overflow-hidden">
-        {/* ... Landing Page Header ... */}
         <header className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between relative z-10">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-lg shadow-purple-500/30">
@@ -572,12 +574,9 @@ export default function HomePage() {
             <Link href="/register" className="px-5 py-2 text-sm text-white bg-purple-600 hover:bg-purple-700 rounded-lg font-medium transition shadow-md shadow-purple-500/30">Get started</Link>
           </div>
         </header>
-        {/* ... Hero ... */}
+
+        {/* Hero Section */}
         <section className="relative max-w-7xl mx-auto px-6 pt-12 pb-24 lg:pt-20">
-          <div className="absolute top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
-            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[50%] rounded-full bg-purple-300/30 blur-[100px]" />
-            <div className="absolute bottom-[20%] right-[10%] w-[30%] h-[40%] rounded-full bg-blue-300/20 blur-[100px]" />
-          </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
               <h1 className="text-5xl lg:text-7xl font-extrabold leading-[1.1] mb-6 text-gray-900 tracking-tight">
@@ -605,11 +604,13 @@ export default function HomePage() {
             </div>
           </div>
         </section>
-        {/* Footer omitted for brevity */}
       </main>
     )
   }
 
+  // ═══════════════════════════════════════════════════════
+  // DASHBOARD
+  // ═══════════════════════════════════════════════════════
   const kesAmount = (stake * 130).toLocaleString()
   const userInitial = user?.email ? user.email[0].toUpperCase() : 'U'
 
@@ -641,6 +642,41 @@ export default function HomePage() {
               </div>
               <ChevronDown className="w-3 h-3 text-gray-400" />
             </button>
+
+            {/* ACCOUNT DROPDOWN */}
+            {isAccountDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-[90]" onClick={() => setIsAccountDropdownOpen(false)} />
+                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 md:left-0 md:translate-x-0 w-72 rounded-2xl border shadow-2xl z-[100] overflow-hidden bg-[#0d0818] border-purple-500/20">
+                  <div className="px-4 py-2 text-[10px] font-bold tracking-wider text-gray-500">SWITCH ACCOUNT</div>
+                  <button onClick={() => { setIsLiveMode(true); setIsAccountDropdownOpen(false) }} className="w-full flex items-center gap-3 px-4 py-3 transition hover:bg-white/5">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isLiveMode ? 'bg-purple-500/20' : 'bg-white/5'}`}>
+                      {isLiveMode ? <span className="text-purple-500 text-sm">✓</span> : <span className="text-gray-400 text-sm">🔒</span>}
+                    </div>
+                    <div className="flex-1 text-left">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-sm">Real account</span>
+                        <span className="font-bold text-sm text-purple-600">${liveBalance.toFixed(2)}</span>
+                      </div>
+                      <div className="text-[11px] text-gray-500">Your live funds</div>
+                    </div>
+                  </button>
+                  <div className="h-px bg-purple-500/10" />
+                  <button onClick={() => { setIsLiveMode(false); setIsAccountDropdownOpen(false) }} className="w-full flex items-center gap-3 px-4 py-3 transition hover:bg-white/5">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${!isLiveMode ? 'bg-purple-500/20' : 'bg-white/5'}`}>
+                      {!isLiveMode ? <span className="text-purple-500 text-sm">✓</span> : <span className="text-yellow-500 text-sm">⚠️</span>}
+                    </div>
+                    <div className="flex-1 text-left">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-sm">Demo account</span>
+                        <span className="font-bold text-sm text-yellow-500">${demoBalance.toFixed(2)}</span>
+                      </div>
+                      <div className="text-[11px] text-gray-500">Practice · virtual funds</div>
+                    </div>
+                  </button>
+                </div>
+              </>
+            )}
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -904,7 +940,181 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* WALLET MODAL & AI SCANNER omitted for length, copy from previous step if needed */}
+      {/* WALLET MODAL */}
+      {isWalletOpen && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <div className="w-full max-w-md rounded-2xl border bg-[#0d0818] border-purple-500/20 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-purple-500/20">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
+                  <Wallet className="w-5 h-5 text-purple-500" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg text-white">Wallet</h3>
+                  <p className="text-xs text-gray-400">
+                    {isLiveMode ? `Live · $${liveBalance.toFixed(2)}` : `Demo · $${demoBalance.toFixed(2)}`}
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => { setIsWalletOpen(false); setWalletMessage(null) }} className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/5">
+                <X className="w-4 h-4 text-gray-400" />
+              </button>
+            </div>
+            <div className="p-5">
+              <div className="flex gap-2 mb-4">
+                <button onClick={() => { setWalletTab('deposit'); setWalletMessage(null) }} className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2 ${walletTab === 'deposit' ? 'bg-purple-600 text-white' : 'text-gray-400'}`}>
+                  <ArrowDownToLine className="w-4 h-4" /> Deposit
+                </button>
+                <button onClick={() => { setWalletTab('withdraw'); setWalletMessage(null) }} className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2 ${walletTab === 'withdraw' ? 'bg-purple-600 text-white' : 'text-gray-400'}`}>
+                  <ArrowUpFromLine className="w-4 h-4" /> Withdraw
+                </button>
+              </div>
+              <div className="flex gap-2 mb-4">
+                <button onClick={() => { setPaymentMethod('mpesa'); setWalletMessage(null) }} className={`flex-1 py-3 rounded-lg text-sm font-semibold transition ${paymentMethod === 'mpesa' ? 'bg-emerald-600 text-white' : 'bg-[#150d24] text-gray-400'}`}>📱 M-Pesa</button>
+                <button onClick={() => { setPaymentMethod('crypto'); setWalletMessage(null) }} className={`flex-1 py-3 rounded-lg text-sm font-semibold transition ${paymentMethod === 'crypto' ? 'bg-orange-500 text-white' : 'bg-[#150d24] text-gray-400'}`}>₿ Crypto</button>
+              </div>
+              {walletTab === 'deposit' && (
+                <>
+                  <div className="mb-4">
+                    <label className="text-xs block mb-2 font-semibold text-gray-400">Amount (USD)</label>
+                    <input type="number" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} placeholder="0.00" min={1}
+                      className="w-full rounded-lg px-4 py-3 outline-none border text-sm font-medium bg-[#150d24] text-white border-purple-500/20 focus:border-purple-500" />
+                    <div className="grid grid-cols-4 gap-2 mt-2">
+                      {[10, 50, 100, 500].map((amt) => (
+                        <button key={amt} onClick={() => setDepositAmount(String(amt))}
+                          className={`py-2 rounded-lg text-xs font-semibold ${depositAmount === String(amt) ? 'bg-purple-600 text-white' : 'bg-[#150d24] text-gray-300'}`}>${amt}</button>
+                      ))}
+                    </div>
+                  </div>
+                  {paymentMethod === 'mpesa' && (
+                    <div className="mb-4">
+                      <label className="text-xs block mb-2 font-semibold text-gray-400">M-Pesa Phone Number</label>
+                      <input type="tel" value={depositPhone} onChange={(e) => setDepositPhone(e.target.value)} placeholder="0712 345 678"
+                        className="w-full rounded-lg px-4 py-3 outline-none border text-sm bg-[#150d24] text-white border-purple-500/20 focus:border-purple-500" />
+                    </div>
+                  )}
+                  {paymentMethod === 'crypto' && (
+                    <>
+                      <div className="mb-4">
+                        <label className="text-xs block mb-2 font-semibold text-gray-400">Select Coin</label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {['USDT', 'BTC', 'ETH'].map((coin) => (
+                            <button key={coin} onClick={() => setCryptoCoin(coin)}
+                              className={`py-2 rounded-lg text-xs font-semibold ${cryptoCoin === coin ? 'bg-orange-500 text-white' : 'bg-[#150d24] text-gray-300'}`}>{coin}</button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="mb-3 p-2.5 rounded-lg text-xs border bg-amber-500/10 border-amber-500/30 text-amber-500">
+                        ⚠️ <b>Network: {CRYPTO_NETWORKS[cryptoCoin]}</b> — send only on this network or funds will be lost.
+                      </div>
+                      <div className="p-3 rounded-lg mb-4 bg-[#150d24]">
+                        <div className="text-xs mb-2 text-gray-400">Send {cryptoCoin} to:</div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 text-xs font-mono break-all text-white">{CRYPTO_ADDRESSES[cryptoCoin]}</div>
+                          <button onClick={() => copyToClipboard(CRYPTO_ADDRESSES[cryptoCoin])} className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+                            {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4 text-purple-500" />}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="mb-4">
+                        <label className="text-xs block mb-2 font-semibold text-gray-400">Transaction hash</label>
+                        <input type="text" value={cryptoTxHash} onChange={(e) => setCryptoTxHash(e.target.value)} placeholder="Paste your TX hash here"
+                          className="w-full rounded-lg px-4 py-3 outline-none border text-sm font-mono bg-[#150d24] text-white border-purple-500/20 focus:border-purple-500" />
+                      </div>
+                    </>
+                  )}
+                  {walletMessage && (
+                    <div className={`mb-4 p-3 rounded-lg text-sm ${walletMessage.includes('✅') ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : 'bg-red-500/10 text-red-400 border border-red-500/30'}`}>{walletMessage}</div>
+                  )}
+                  <button onClick={paymentMethod === 'mpesa' ? handleMpesaDeposit : handleCryptoDeposit}
+                    disabled={isProcessing || !depositAmount || (paymentMethod === 'crypto' && !cryptoTxHash)}
+                    className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-xl font-bold text-sm">
+                    {isProcessing ? 'Processing...' : paymentMethod === 'mpesa' ? `Pay $${depositAmount || '0'} with M-Pesa` : `Submit ${cryptoCoin} Deposit`}
+                  </button>
+                </>
+              )}
+              {walletTab === 'withdraw' && (
+                <>
+                  <div className="mb-4">
+                    <label className="text-xs block mb-2 font-semibold text-gray-400">Amount (USD)</label>
+                    <input type="number" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} placeholder="0.00" min={1}
+                      className="w-full rounded-lg px-4 py-3 outline-none border text-sm font-medium bg-[#150d24] text-white border-purple-500/20" />
+                    <p className="text-xs mt-2 text-gray-500">Available: ${liveBalance.toFixed(2)}</p>
+                  </div>
+                  {paymentMethod === 'mpesa' && (
+                    <div className="mb-4">
+                      <label className="text-xs block mb-2 font-semibold text-gray-400">M-Pesa Phone</label>
+                      <input type="tel" value={withdrawPhone} onChange={(e) => setWithdrawPhone(e.target.value)} placeholder="0712 345 678"
+                        className="w-full rounded-lg px-4 py-3 outline-none border text-sm bg-[#150d24] text-white border-purple-500/20" />
+                    </div>
+                  )}
+                  {paymentMethod === 'crypto' && (
+                    <div className="mb-4">
+                      <label className="text-xs block mb-2 font-semibold text-gray-400">Your {cryptoCoin} Address</label>
+                      <input type="text" value={withdrawAddress} onChange={(e) => setWithdrawAddress(e.target.value)} placeholder="Paste your wallet address"
+                        className="w-full rounded-lg px-4 py-3 outline-none border text-sm font-mono bg-[#150d24] text-white border-purple-500/20" />
+                    </div>
+                  )}
+                  {walletMessage && (
+                    <div className={`mb-4 p-3 rounded-lg text-sm ${walletMessage.includes('✅') ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : 'bg-red-500/10 text-red-400 border border-red-500/30'}`}>{walletMessage}</div>
+                  )}
+                  <button onClick={handleWithdraw} disabled={isProcessing || !withdrawAmount || parseFloat(withdrawAmount) > liveBalance}
+                    className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-xl font-bold text-sm">
+                    {isProcessing ? 'Submitting...' : `Request $${withdrawAmount || '0'} Withdrawal`}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI SCANNER */}
+      {tradeMode === 'ai' && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <div className="w-full max-w-md rounded-2xl border bg-[#0d0818] border-[#1f1433]">
+            <div className="flex items-start justify-between p-5 border-b border-[#1f1433]">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center"><Sparkles className="w-5 h-5 text-purple-500" /></div>
+                <div>
+                  <h3 className="font-bold text-lg text-white">Entry Scanner</h3>
+                  <p className="text-xs text-gray-500">Deep-scans 10 markets for the best entry</p>
+                </div>
+              </div>
+              <button onClick={() => setTradeMode('manual')} className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#150d24]"><X className="w-4 h-4 text-gray-400" /></button>
+            </div>
+            <div className="p-5">
+              <div className="mb-4">
+                <label className="text-xs block mb-2 font-semibold text-gray-400">Trade type</label>
+                <select value={aiTradeType} onChange={(e) => setAiTradeType(e.target.value)} className="w-full rounded-lg px-4 py-3 outline-none border text-sm font-medium bg-[#150d24] text-white border-[#1f1433]">
+                  <option>Match / Differ</option><option>Over / Under</option><option>Even / Odd</option><option>Rise / Fall</option>
+                </select>
+              </div>
+              {aiScanning && (
+                <>
+                  <div className="mb-4 p-5 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-center">
+                    <div className="w-14 h-14 mx-auto rounded-full bg-purple-500/20 flex items-center justify-center mb-3 animate-pulse"><Sparkles className="w-6 h-6 text-purple-500" /></div>
+                    <div className="text-white font-bold">Deep scanning</div>
+                  </div>
+                  <div className="mb-4">
+                    <div className="flex justify-between items-center mb-2"><span className="text-xs text-gray-500">Analyzing...</span><span className="text-xs font-medium text-gray-400">{aiScanProgress}/10</span></div>
+                    <div className="h-1.5 rounded-full overflow-hidden bg-[#150d24]"><div className="h-full bg-purple-500 transition-all" style={{ width: `${(aiScanProgress / 10) * 100}%` }} /></div>
+                  </div>
+                </>
+              )}
+              {!aiScanning && aiScanProgress === 10 && (
+                <>
+                  <button onClick={runDeepScan} className="w-full py-3.5 bg-purple-600 text-white rounded-xl font-bold text-sm mb-3">Re-scan</button>
+                  <button onClick={loadScannerBot} className="w-full py-3.5 rounded-xl font-bold text-sm bg-[#150d24] text-purple-400 border border-purple-500/30">Load {aiBestMarket} Bot</button>
+                </>
+              )}
+              {!aiScanning && aiScanProgress === 0 && (
+                <button onClick={runDeepScan} className="w-full py-3.5 bg-purple-600 text-white rounded-xl font-bold text-sm">Deep Scan</button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
