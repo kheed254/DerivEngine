@@ -18,6 +18,7 @@ export default function HomePage() {
   const [liveBalance, setLiveBalance] = useState(0)
   const [balancePulse, setBalancePulse] = useState(false)
   const [isLiveMode, setIsLiveMode] = useState(true)
+  const [displayCurrency, setDisplayCurrency] = useState<'USD' | 'KES'>('USD')
   const [isAccountDropdownOpen, setIsAccountDropdownOpen] = useState(false)
   const [stake, setStake] = useState(10)
   const [duration, setDuration] = useState(60)
@@ -544,7 +545,7 @@ export default function HomePage() {
   ]
 
   // ═══════════════════════════════════════════════════════
-  // NEW LANDING PAGE
+  // LANDING PAGE
   // ═══════════════════════════════════════════════════════
   if (!showDashboard) {
     return (
@@ -733,7 +734,7 @@ export default function HomePage() {
   // ═══════════════════════════════════════════════════════
   // DASHBOARD
   // ═══════════════════════════════════════════════════════
-  const kesAmount = (stake * 130).toLocaleString()
+  const displayAmount = displayCurrency === 'USD' ? stake : stake * 130;
 
   return (
     <main className={`min-h-screen pb-20 md:pb-0 ${isDark ? 'bg-[#0a0613] text-white' : 'bg-gray-50 text-gray-900'}`}>
@@ -920,8 +921,14 @@ export default function HomePage() {
             </div>
 
             <div className="flex justify-between items-center mb-2">
-              <span className={`text-xs md:text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Stake (USD)</span>
+              <span className={`text-xs md:text-sm font-semibold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                Stake ({displayCurrency})
+              </span>
               <div className="flex items-center gap-2">
+                <div className={`flex gap-1 p-0.5 rounded-lg ${isDark ? 'bg-[#150d24]' : 'bg-gray-100'}`}>
+                  <button onClick={() => setDisplayCurrency('USD')} className={`px-2 py-1 text-[10px] font-bold rounded-md ${displayCurrency === 'USD' ? 'bg-purple-600 text-white' : 'text-gray-500'}`}>USD</button>
+                  <button onClick={() => setDisplayCurrency('KES')} className={`px-2 py-1 text-[10px] font-bold rounded-md ${displayCurrency === 'KES' ? 'bg-purple-600 text-white' : 'text-gray-500'}`}>KES</button>
+                </div>
                 {!isLiveMode && <button onClick={resetDemo} className="text-[10px] px-2 py-0.5 border border-yellow-500/50 text-yellow-500 rounded">Reset demo</button>}
               </div>
             </div>
@@ -929,15 +936,22 @@ export default function HomePage() {
             <div className="flex items-center gap-2 mb-1">
               <button onClick={() => setStake(Math.max(1, stake - 1))} className={`w-12 h-14 rounded-xl text-2xl font-bold transition active:scale-95 ${isDark ? 'bg-[#150d24] text-white' : 'bg-gray-100 text-gray-900'}`}>−</button>
               <input
-                type="number" value={stake}
-                onChange={(e) => setStake(Math.max(1, Number(e.target.value)))} min={1}
+                type="number" 
+                value={displayCurrency === 'USD' ? stake : stake * 130}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  setStake(displayCurrency === 'USD' ? Math.max(1, val) : Math.max(1, val / 130));
+                }} 
+                min={1}
                 className={`flex-1 min-w-0 text-center text-2xl font-bold rounded-xl py-3 outline-none border-2 transition ${
                   isDark ? 'bg-[#150d24] text-white border-purple-500/20 focus:border-purple-500' : 'bg-gray-50 text-gray-900 border-gray-200 focus:border-purple-500'
                 }`}
               />
               <button onClick={() => setStake(stake + 1)} className={`w-12 h-14 rounded-xl text-2xl font-bold transition active:scale-95 ${isDark ? 'bg-[#150d24] text-white' : 'bg-gray-100 text-gray-900'}`}>+</button>
             </div>
-            <div className={`text-right text-[11px] mb-3 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>≈ KES {kesAmount}</div>
+            <div className={`text-right text-[11px] mb-3 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+              {displayCurrency === 'USD' ? `≈ KES ${(stake * 130).toLocaleString()}` : `≈ USD $${(stake / 130).toFixed(2)}`}
+            </div>
 
             <div className="grid grid-cols-6 gap-1.5 mb-4">
               {[1, 5, 10, 25, 50, 100].map((val) => (

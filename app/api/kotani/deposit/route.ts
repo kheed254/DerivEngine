@@ -61,10 +61,14 @@ export async function POST(req: NextRequest) {
        return NextResponse.json({ error: 'Kotani did not return a customer key' }, { status: 500 })
     }
 
+    // 👇 NEW CODE: Convert USD to KES before sending to Kotani 👇
+    const KES_RATE = 130;
+    const amountInKes = Math.round(numAmount * KES_RATE);
+
     // 2. Prepare the deposit payload
     const body = {
       customer_key: customerKey,
-      amount: numAmount,
+      amount: amountInKes, // Sends 1300 KES if user typed 10 USD
       currency: 'KES',
       wallet_id: KOTANI_WALLET_ID,
       callback_url: `https://derivengine.vercel.app/api/kotani/webhook`,
