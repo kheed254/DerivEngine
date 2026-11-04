@@ -39,7 +39,7 @@ export default function LoginPage() {
           <div className="w-8 h-8 rounded-lg bg-[#7c3aed] flex items-center justify-center">
             <span className="text-white font-bold text-lg italic">~</span>
           </div>
-          <span className="font-bold text-xl text-gray-900 tracking-tight">SinTrades</span>
+          <span className="font-bold text-xl text-gray-900 tracking-tight">DerivEngine</span>
         </div>
 
         {/* Title */}
