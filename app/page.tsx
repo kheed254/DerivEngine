@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { DerivClient } from '@/lib/derivClient'
-import { ChevronDown, LogOut, Clock, Zap, Play, X, Search, Sparkles, Copy, Check, Wallet, ArrowDownToLine, ArrowUpFromLine, TrendingUp, History, Gift, BarChart3, ShieldCheck, ArrowRight, Bell } from 'lucide-react'
+import { ChevronDown, LogOut, Clock, Zap, Play, X, Search, Sparkles, Copy, Check, Wallet, ArrowDownToLine, ArrowUpFromLine, TrendingUp, History, Gift, BarChart3, ShieldCheck, ArrowRight, Bell, Sun, Moon } from 'lucide-react'
 
 export default function HomePage() {
   const [price, setPrice] = useState(730.69)
@@ -266,16 +266,17 @@ export default function HomePage() {
         const AreaSeries = lib.AreaSeries
         if (chartInstance.current) { chartInstance.current.remove(); chartInstance.current = null }
         const isMobile = container.clientWidth < 768
+        
         const chart = createChart(container, {
           width: container.clientWidth,
           height: isMobile ? 250 : 400,
-          layout: { background: { color: 'transparent' }, textColor: '#9ca3af' },
+          layout: { background: { color: 'transparent' }, textColor: isDark ? '#9ca3af' : '#6b7280' },
           grid: {
-            vertLines: { color: 'rgba(255, 255, 255, 0.05)', style: LineStyle?.Dotted ?? 2 },
-            horzLines: { color: 'rgba(255, 255, 255, 0.05)', style: LineStyle?.Dotted ?? 2 }
+            vertLines: { color: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)', style: LineStyle?.Dotted ?? 2 },
+            horzLines: { color: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)', style: LineStyle?.Dotted ?? 2 }
           },
-          rightPriceScale: { borderColor: 'rgba(255,255,255,0.1)', scaleMargins: { top: 0.1, bottom: 0.1 } },
-          timeScale: { borderColor: 'rgba(255,255,255,0.1)', timeVisible: true, secondsVisible: true },
+          rightPriceScale: { borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)', scaleMargins: { top: 0.1, bottom: 0.1 } },
+          timeScale: { borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)', timeVisible: true, secondsVisible: true },
           crosshair: { mode: 1 },
         })
         
@@ -332,7 +333,7 @@ export default function HomePage() {
       window.removeEventListener('resize', handleResize)
       if (chartInstance.current) { chartInstance.current.remove(); chartInstance.current = null; seriesRef.current = null }
     }
-  }, [showDashboard, isLoggedIn, selectedMarket])
+  }, [showDashboard, isLoggedIn, selectedMarket, isDark])
 
   useEffect(() => {
     if (!showDashboard) return
@@ -556,7 +557,6 @@ export default function HomePage() {
     'Volatility 10 (1s) Index', 'Volatility 10 Index',
   ]
 
-  // 👇 NEW LOGIC: FIND MOST & LEAST APPEARING DIGITS 👇
   let maxDigit = 0;
   let maxPct = -1;
   let minDigit = 0;
@@ -568,11 +568,11 @@ export default function HomePage() {
       if (pct < minPct) { minPct = pct; minDigit = digit; }
     });
   }
-  // 👆 ---------------------------------------------- 👆
 
   if (!showDashboard) {
     return (
       <main className="min-h-screen bg-[#f8f9fc] text-gray-900 font-sans overflow-hidden">
+        {/* ... Landing Page ... */}
         <header className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between relative z-10">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-lg shadow-purple-500/30">
@@ -585,7 +585,6 @@ export default function HomePage() {
             <Link href="/register" className="px-5 py-2 text-sm text-white bg-purple-600 hover:bg-purple-700 rounded-lg font-medium transition shadow-md shadow-purple-500/30">Get started</Link>
           </div>
         </header>
-
         <section className="relative max-w-7xl mx-auto px-6 pt-12 pb-24 lg:pt-20">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
@@ -622,28 +621,28 @@ export default function HomePage() {
   const userInitial = user?.email ? user.email[0].toUpperCase() : 'U'
 
   return (
-    <main className="min-h-screen pb-20 md:pb-0 bg-[#0a0613] text-white">
+    <main className={`min-h-screen pb-20 md:pb-0 ${isDark ? 'bg-[#0a0613] text-white' : 'bg-gray-50 text-gray-900'}`}>
 
       {/* ── TOP BAR ───────────────────────────── */}
-      <nav className="border-b border-[#1f1433] bg-[#0d0818] sticky top-0 z-30">
+      <nav className={`border-b sticky top-0 z-30 ${isDark ? 'border-[#1f1433] bg-[#0d0818]' : 'border-gray-200 bg-white'}`}>
         <div className="px-4 md:px-6 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 flex-shrink-0">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center">
               <span className="text-white font-bold text-sm italic">~</span>
             </div>
-            <span className="font-bold hidden sm:inline text-white text-lg">DerivEngine</span>
+            <span className={`font-bold hidden sm:inline text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>DerivEngine</span>
           </div>
 
           <div className="relative flex-1 flex justify-center md:flex-none md:justify-start">
             <button
               onClick={() => setIsAccountDropdownOpen(!isAccountDropdownOpen)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs border bg-[#150d24] border-purple-500/20 transition"
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs border transition ${isDark ? 'bg-[#150d24] border-purple-500/20' : 'bg-gray-100 border-gray-200'}`}
             >
               <div className="text-left">
                 <div className="text-[9px] font-bold tracking-wider uppercase text-emerald-400">
                   {isLiveMode ? 'REAL' : 'DEMO'}
                 </div>
-                <div className="font-bold text-sm text-white">
+                <div className={`font-bold text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>
                   ${balance.toFixed(2)}
                 </div>
               </div>
@@ -654,32 +653,37 @@ export default function HomePage() {
             {isAccountDropdownOpen && (
               <>
                 <div className="fixed inset-0 z-[90]" onClick={() => setIsAccountDropdownOpen(false)} />
-                <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 md:left-0 md:translate-x-0 w-72 rounded-2xl border shadow-2xl z-[100] overflow-hidden bg-[#0d0818] border-purple-500/20">
+                <div className={`absolute top-full mt-2 left-1/2 -translate-x-1/2 md:left-0 md:translate-x-0 w-72 rounded-2xl border shadow-2xl z-[100] overflow-hidden ${isDark ? 'bg-[#0d0818] border-purple-500/20' : 'bg-white border-gray-200'}`}>
                   <div className="px-4 py-2 text-[10px] font-bold tracking-wider text-gray-500">SWITCH ACCOUNT</div>
-                  <button onClick={() => { setIsLiveMode(true); setIsAccountDropdownOpen(false) }} className="w-full flex items-center gap-3 px-4 py-3 transition hover:bg-white/5">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isLiveMode ? 'bg-purple-500/20' : 'bg-white/5'}`}>
+                  <button onClick={() => { setIsLiveMode(true); setIsAccountDropdownOpen(false) }} className={`w-full flex items-center gap-3 px-4 py-3 transition ${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'}`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isLiveMode ? 'bg-purple-500/20' : (isDark ? 'bg-white/5' : 'bg-gray-100')}`}>
                       {isLiveMode ? <span className="text-purple-500 text-sm">✓</span> : <span className="text-gray-400 text-sm">🔒</span>}
                     </div>
                     <div className="flex-1 text-left">
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold text-sm">Real account</span>
+                        <span className={`font-semibold text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>Real account</span>
                         <span className="font-bold text-sm text-purple-600">${liveBalance.toFixed(2)}</span>
                       </div>
                       <div className="text-[11px] text-gray-500">Your live funds</div>
                     </div>
                   </button>
-                  <div className="h-px bg-purple-500/10" />
-                  <button onClick={() => { setIsLiveMode(false); setIsAccountDropdownOpen(false) }} className="w-full flex items-center gap-3 px-4 py-3 transition hover:bg-white/5">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${!isLiveMode ? 'bg-purple-500/20' : 'bg-white/5'}`}>
+                  <div className={`h-px ${isDark ? 'bg-purple-500/10' : 'bg-gray-100'}`} />
+                  <button onClick={() => { setIsLiveMode(false); setIsAccountDropdownOpen(false) }} className={`w-full flex items-center gap-3 px-4 py-3 transition ${isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'}`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${!isLiveMode ? 'bg-purple-500/20' : (isDark ? 'bg-white/5' : 'bg-gray-100')}`}>
                       {!isLiveMode ? <span className="text-purple-500 text-sm">✓</span> : <span className="text-yellow-500 text-sm">⚠️</span>}
                     </div>
                     <div className="flex-1 text-left">
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold text-sm">Demo account</span>
+                        <span className={`font-semibold text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>Demo account</span>
                         <span className="font-bold text-sm text-yellow-500">${demoBalance.toFixed(2)}</span>
                       </div>
                       <div className="text-[11px] text-gray-500">Practice · virtual funds</div>
                     </div>
+                  </button>
+                  <div className={`h-px ${isDark ? 'bg-purple-500/10' : 'bg-gray-100'}`} />
+                  <button onClick={handleLogout} className={`w-full flex items-center gap-3 px-4 py-3 transition ${isDark ? 'hover:bg-white/5 text-red-400' : 'hover:bg-gray-50 text-red-500'}`}>
+                    <LogOut className="w-4 h-4 ml-2" />
+                    <span className="font-semibold text-sm">Log out</span>
                   </button>
                 </div>
               </>
@@ -687,6 +691,12 @@ export default function HomePage() {
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={() => setTheme(isDark ? 'light' : 'dark')}
+              className={`w-8 h-8 rounded-full flex items-center justify-center transition ${isDark ? 'bg-white/5 text-gray-400 hover:bg-white/10' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            >
+              {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
             <button
               onClick={() => { setWalletTab('deposit'); setIsWalletOpen(true); setIsLiveMode(true) }}
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold bg-purple-600 hover:bg-purple-700 text-white"
@@ -702,33 +712,32 @@ export default function HomePage() {
 
       <div className="px-3 md:px-4 py-3 md:py-4 grid grid-cols-1 lg:grid-cols-12 gap-3 md:gap-4 max-w-[1600px] mx-auto">
 
-        {/* Main Trading Panel */}
         <div className="lg:col-span-7 space-y-3">
 
           {/* Market header */}
-          <div className="rounded-2xl border p-3 md:p-4 bg-[#0d0818] border-[#1f1433]">
+          <div className={`rounded-2xl border p-3 md:p-4 ${isDark ? 'bg-[#0d0818] border-[#1f1433]' : 'bg-white border-gray-200'}`}>
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <select
                     value={selectedMarket}
                     onChange={(e) => setSelectedMarket(e.target.value)}
-                    className="font-semibold text-sm md:text-base outline-none cursor-pointer bg-transparent text-white"
+                    className={`font-semibold text-sm md:text-base outline-none cursor-pointer bg-transparent ${isDark ? 'text-white' : 'text-gray-900'}`}
                   >
-                    {markets.map((m) => (<option key={m} value={m} className="bg-[#150d24]">{m}</option>))}
+                    {markets.map((m) => (<option key={m} value={m} className={isDark ? 'bg-[#150d24]' : 'bg-white'}>{m}</option>))}
                   </select>
                   <ChevronDown className="w-4 h-4 text-gray-400 -ml-1" />
                   <span className="text-[10px] bg-emerald-500/10 text-emerald-500 px-2 py-0.5 rounded flex items-center gap-1 flex-shrink-0 font-medium">
                     <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span> LIVE
                   </span>
-                  <button className="text-[10px] bg-white/5 text-gray-400 px-2 py-0.5 rounded flex items-center gap-1 flex-shrink-0 font-medium">
+                  <button className={`text-[10px] px-2 py-0.5 rounded flex items-center gap-1 flex-shrink-0 font-medium ${isDark ? 'bg-white/5 text-gray-400' : 'bg-gray-100 text-gray-500'}`}>
                     <Bell className="w-3 h-3" /> Alert
                   </button>
                 </div>
                 <div className="text-[10px] text-gray-500">Very High volatility · synthetic index</div>
               </div>
               <div className="text-right flex-shrink-0">
-                <div className="text-xl md:text-2xl font-bold text-emerald-400">{price.toFixed(2)}</div>
+                <div className={`text-xl md:text-2xl font-bold ${isDark ? 'text-white' : 'text-emerald-500'}`}>{price.toFixed(2)}</div>
                 <div className={`text-xs font-semibold ${priceChangePct >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
                   {priceChangePct >= 0 ? '▲' : '▼'} {Math.abs(priceChangePct).toFixed(2)}%
                 </div>
@@ -738,13 +747,12 @@ export default function HomePage() {
           </div>
 
           {/* Digits */}
-          <div className="rounded-2xl border p-3 md:p-4 bg-[#0d0818] border-[#1f1433]">
+          <div className={`rounded-2xl border p-3 md:p-4 ${isDark ? 'bg-[#0d0818] border-[#1f1433]' : 'bg-white border-gray-200'}`}>
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-3 gap-2">
-              <div className="text-xs font-bold tracking-wide text-gray-400">
+              <div className={`text-xs font-bold tracking-wide ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                 <span className="text-purple-500">#</span> LIVE LAST DIGITS
               </div>
               
-              {/* 👇 SHOW MOST & LEAST APPEARING DIGITS 👇 */}
               {digitTickCount >= 20 && (
                 <div className="flex gap-2 text-[10px] font-semibold">
                   <span className="bg-emerald-500/10 text-emerald-500 px-2 py-1 rounded-md flex items-center gap-1">
@@ -755,7 +763,6 @@ export default function HomePage() {
                   </span>
                 </div>
               )}
-              {/* 👆 ------------------------------------ 👆 */}
 
             </div>
             <div className="grid grid-cols-10 gap-0.5 md:gap-1">
@@ -769,11 +776,11 @@ export default function HomePage() {
                   <button key={digit} onClick={() => setSelectedDigit(digit)} className="flex flex-col items-center gap-1">
                     <div className="relative w-9 h-9 md:w-12 md:h-12 flex items-center justify-center">
                       <svg className="absolute inset-0 -rotate-90" width="36" height="36" viewBox="0 0 36 36">
-                        <circle cx="18" cy="18" r="18" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="2.5" />
-                        <circle cx="18" cy="18" r="18" fill="none" stroke={isLast ? '#10b981' : isSelected ? '#7c3aed' : 'rgba(255,255,255,0.25)'} strokeWidth="2.5" strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round" className="transition-all duration-500" />
+                        <circle cx="18" cy="18" r="18" fill="none" stroke={isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'} strokeWidth="2.5" />
+                        <circle cx="18" cy="18" r="18" fill="none" stroke={isLast ? '#10b981' : isSelected ? '#7c3aed' : (isDark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.2)')} strokeWidth="2.5" strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round" className="transition-all duration-500" />
                       </svg>
-                      <div className={`w-6 h-6 md:w-9 md:h-9 rounded-full flex items-center justify-center transition-all bg-[#150d24] ${isSelected ? 'ring-2 ring-purple-500' : isLast ? 'ring-2 ring-emerald-500' : ''}`}>
-                        <span className={`text-[10px] md:text-sm font-bold ${isSelected || isLast ? 'text-white' : 'text-gray-400'}`}>{digit}</span>
+                      <div className={`w-6 h-6 md:w-9 md:h-9 rounded-full flex items-center justify-center transition-all ${isDark ? 'bg-[#150d24]' : 'bg-white'} ${isSelected ? 'ring-2 ring-purple-500' : isLast ? 'ring-2 ring-emerald-500' : ''}`}>
+                        <span className={`text-[10px] md:text-sm font-bold ${isSelected || isLast ? (isDark ? 'text-white' : 'text-gray-900') : 'text-gray-400'}`}>{digit}</span>
                       </div>
                     </div>
                     <span className={`text-[9px] md:text-[10px] font-medium ${isLast ? 'text-emerald-500' : 'text-gray-500'}`}>{pct}%</span>
@@ -784,34 +791,32 @@ export default function HomePage() {
           </div>
 
           {/* Trade panel */}
-          <div className="rounded-2xl border p-3 md:p-4 bg-[#0d0818] border-[#1f1433]">
-            <div className="grid grid-cols-3 gap-1 p-1 rounded-xl mb-3 bg-[#150d24]">
-              <button onClick={() => setTradeMode('manual')} className={`py-2 rounded-lg text-xs md:text-sm font-semibold transition ${tradeMode === 'manual' ? 'bg-purple-600 text-white shadow' : 'text-gray-400'}`}>Manual</button>
-              <button onClick={() => setTradeMode('auto')} className={`py-2 rounded-lg text-xs md:text-sm font-semibold transition ${tradeMode === 'auto' ? 'bg-purple-600 text-white shadow' : 'text-gray-400'}`}>Auto</button>
-              <button onClick={() => setTradeMode('ai')} className={`py-2 rounded-lg text-xs md:text-sm font-semibold transition flex items-center justify-center gap-1 ${tradeMode === 'ai' ? 'bg-purple-600 text-white shadow' : 'text-gray-400'}`}>✨ AI</button>
+          <div className={`rounded-2xl border p-3 md:p-4 ${isDark ? 'bg-[#0d0818] border-[#1f1433]' : 'bg-white border-gray-200'}`}>
+            <div className={`grid grid-cols-3 gap-1 p-1 rounded-xl mb-3 ${isDark ? 'bg-[#150d24]' : 'bg-gray-100'}`}>
+              <button onClick={() => setTradeMode('manual')} className={`py-2 rounded-lg text-xs md:text-sm font-semibold transition ${tradeMode === 'manual' ? 'bg-purple-600 text-white shadow' : (isDark ? 'text-gray-400' : 'text-gray-600')}`}>Manual</button>
+              <button onClick={() => setTradeMode('auto')} className={`py-2 rounded-lg text-xs md:text-sm font-semibold transition ${tradeMode === 'auto' ? 'bg-purple-600 text-white shadow' : (isDark ? 'text-gray-400' : 'text-gray-600')}`}>Auto</button>
+              <button onClick={() => setTradeMode('ai')} className={`py-2 rounded-lg text-xs md:text-sm font-semibold transition flex items-center justify-center gap-1 ${tradeMode === 'ai' ? 'bg-purple-600 text-white shadow' : (isDark ? 'text-gray-400' : 'text-gray-600')}`}>✨ AI</button>
             </div>
 
             <div className="grid grid-cols-3 gap-2 mb-3">
-              <button onClick={() => setTradeType('rise-fall')} className={`py-2.5 rounded-xl text-xs md:text-sm font-semibold border transition ${tradeType === 'rise-fall' ? 'bg-purple-600 text-white border-purple-600' : 'bg-[#150d24] text-gray-300 border-[#1f1433]'}`}>Rise/Fall</button>
-              <button onClick={() => setTradeType('digits')} className={`py-2.5 rounded-xl text-xs md:text-sm font-semibold border transition ${tradeType === 'digits' ? 'bg-purple-600 text-white border-purple-600' : 'bg-[#150d24] text-gray-300 border-[#1f1433]'}`}>Digits</button>
+              <button onClick={() => setTradeType('rise-fall')} className={`py-2.5 rounded-xl text-xs md:text-sm font-semibold border transition ${tradeType === 'rise-fall' ? 'bg-purple-600 text-white border-purple-600' : (isDark ? 'bg-[#150d24] text-gray-300 border-[#1f1433]' : 'bg-gray-50 text-gray-700 border-gray-200')}`}>Rise/Fall</button>
+              <button onClick={() => setTradeType('digits')} className={`py-2.5 rounded-xl text-xs md:text-sm font-semibold border transition ${tradeType === 'digits' ? 'bg-purple-600 text-white border-purple-600' : (isDark ? 'bg-[#150d24] text-gray-300 border-[#1f1433]' : 'bg-gray-50 text-gray-700 border-gray-200')}`}>Digits</button>
               {tradeMode !== 'auto' && (
-                <button onClick={() => setTradeType('multipliers')} className={`py-2.5 rounded-xl text-xs md:text-sm font-semibold border transition ${tradeType === 'multipliers' ? 'bg-purple-600 text-white border-purple-600' : 'bg-[#150d24] text-gray-300 border-[#1f1433]'}`}>Multipliers</button>
+                <button onClick={() => setTradeType('multipliers')} className={`py-2.5 rounded-xl text-xs md:text-sm font-semibold border transition ${tradeType === 'multipliers' ? 'bg-purple-600 text-white border-purple-600' : (isDark ? 'bg-[#150d24] text-gray-300 border-[#1f1433]' : 'bg-gray-50 text-gray-700 border-gray-200')}`}>Multipliers</button>
               )}
             </div>
 
             <div className="flex justify-between items-center mb-2">
-              <span className="text-xs md:text-sm font-semibold text-gray-400">
+              <span className={`text-xs md:text-sm font-semibold ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                 Stake ({displayCurrency})
               </span>
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1 text-xs text-gray-400">
-                  <Wallet className="w-3 h-3" /> ${balance.toFixed(2)}
-                </div>
+              <div className={`flex items-center gap-1 text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                <Wallet className="w-3 h-3" /> ${balance.toFixed(2)}
               </div>
             </div>
 
             <div className="flex items-center gap-2 mb-1">
-              <button onClick={() => setStake(Math.max(1, stake - 1))} className="w-12 h-14 rounded-xl text-2xl font-bold transition active:scale-95 bg-[#150d24] text-white">−</button>
+              <button onClick={() => setStake(Math.max(1, stake - 1))} className={`w-12 h-14 rounded-xl text-2xl font-bold transition active:scale-95 ${isDark ? 'bg-[#150d24] text-white' : 'bg-gray-100 text-gray-900'}`}>−</button>
               <input
                 type="number" 
                 value={displayCurrency === 'USD' ? stake : stake * 130}
@@ -820,9 +825,9 @@ export default function HomePage() {
                   setStake(displayCurrency === 'USD' ? Math.max(1, val) : Math.max(1, val / 130));
                 }} 
                 min={1}
-                className="flex-1 min-w-0 text-center text-2xl font-bold rounded-xl py-3 outline-none border-2 transition bg-[#150d24] text-white border-[#1f1433] focus:border-purple-500"
+                className={`flex-1 min-w-0 text-center text-2xl font-bold rounded-xl py-3 outline-none border-2 transition ${isDark ? 'bg-[#150d24] text-white border-[#1f1433] focus:border-purple-500' : 'bg-gray-50 text-gray-900 border-gray-200 focus:border-purple-500'}`}
               />
-              <button onClick={() => setStake(stake + 1)} className="w-12 h-14 rounded-xl text-2xl font-bold transition active:scale-95 bg-[#150d24] text-white">+</button>
+              <button onClick={() => setStake(stake + 1)} className={`w-12 h-14 rounded-xl text-2xl font-bold transition active:scale-95 ${isDark ? 'bg-[#150d24] text-white' : 'bg-gray-100 text-gray-900'}`}>+</button>
             </div>
             <div className="text-right text-[11px] mb-3 text-gray-500">
               {displayCurrency === 'USD' ? `≈ KES ${(stake * 130).toLocaleString()}` : `≈ USD $${(stake / 130).toFixed(2)}`}
@@ -831,7 +836,7 @@ export default function HomePage() {
             <div className="grid grid-cols-6 gap-1.5 mb-4">
               {[1, 5, 10, 25, 50, 100].map((val) => (
                 <button key={val} onClick={() => setStake(val)}
-                  className={`py-2.5 rounded-lg text-xs font-semibold transition ${stake === val ? 'bg-purple-600 text-white' : 'bg-[#150d24] text-gray-300'}`}>
+                  className={`py-2.5 rounded-lg text-xs font-semibold transition ${stake === val ? 'bg-purple-600 text-white' : (isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700')}`}>
                   {val}
                 </button>
               ))}
@@ -840,9 +845,9 @@ export default function HomePage() {
             {tradeMode === 'manual' && tradeType === 'digits' && (
               <>
                 <div className="grid grid-cols-3 gap-2 mb-3">
-                  <button onClick={() => setDigitMode('over-under')} className={`py-2.5 rounded-xl text-xs font-semibold border ${digitMode === 'over-under' ? 'bg-purple-600 text-white border-purple-600' : 'bg-[#150d24] text-gray-300 border-[#1f1433]'}`}>Over / Under</button>
-                  <button onClick={() => setDigitMode('even-odd')} className={`py-2.5 rounded-xl text-xs font-semibold border ${digitMode === 'even-odd' ? 'bg-purple-600 text-white border-purple-600' : 'bg-[#150d24] text-gray-300 border-[#1f1433]'}`}>Even / Odd</button>
-                  <button onClick={() => setDigitMode('matches-differs')} className={`py-2.5 rounded-xl text-xs font-semibold border ${digitMode === 'matches-differs' ? 'bg-purple-600 text-white border-purple-600' : 'bg-[#150d24] text-gray-300 border-[#1f1433]'}`}>Matches / Differs</button>
+                  <button onClick={() => setDigitMode('over-under')} className={`py-2.5 rounded-xl text-xs font-semibold border ${digitMode === 'over-under' ? 'bg-purple-600 text-white border-purple-600' : (isDark ? 'bg-[#150d24] text-gray-300 border-[#1f1433]' : 'bg-gray-50 text-gray-700 border-gray-200')}`}>Over / Under</button>
+                  <button onClick={() => setDigitMode('even-odd')} className={`py-2.5 rounded-xl text-xs font-semibold border ${digitMode === 'even-odd' ? 'bg-purple-600 text-white border-purple-600' : (isDark ? 'bg-[#150d24] text-gray-300 border-[#1f1433]' : 'bg-gray-50 text-gray-700 border-gray-200')}`}>Even / Odd</button>
+                  <button onClick={() => setDigitMode('matches-differs')} className={`py-2.5 rounded-xl text-xs font-semibold border ${digitMode === 'matches-differs' ? 'bg-purple-600 text-white border-purple-600' : (isDark ? 'bg-[#150d24] text-gray-300 border-[#1f1433]' : 'bg-gray-50 text-gray-700 border-gray-200')}`}>Matches / Differs</button>
                 </div>
 
                 {digitMode === 'even-odd' && (
@@ -925,34 +930,34 @@ export default function HomePage() {
         </div>
 
         <div className="hidden lg:block lg:col-span-3 space-y-3">
-          <div className="rounded-2xl border p-4 bg-[#0d0818] border-[#1f1433]">
-            <div className="text-xs font-bold text-gray-400 mb-3">ACCOUNT</div>
-            <div className="text-xs text-gray-400">Balance</div>
+          <div className={`rounded-2xl border p-4 ${isDark ? 'bg-[#0d0818] border-[#1f1433]' : 'bg-white border-gray-200'}`}>
+            <div className={`text-xs font-bold mb-3 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>ACCOUNT</div>
+            <div className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Balance</div>
             <div className="text-2xl font-bold text-purple-600">${balance.toFixed(2)}</div>
           </div>
         </div>
       </div>
 
       {/* MOBILE BOTTOM NAV */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 border-t md:hidden bg-[#0d0818] border-[#1f1433]">
+      <div className={`fixed bottom-0 left-0 right-0 z-30 border-t md:hidden ${isDark ? 'bg-[#0d0818] border-[#1f1433]' : 'bg-white border-gray-200'}`}>
         <div className="grid grid-cols-5 py-2">
           <button className="flex flex-col items-center gap-0.5 py-1 text-purple-500">
             <TrendingUp className="w-5 h-5" />
             <span className="text-[10px] font-semibold">Trade</span>
           </button>
-          <button onClick={() => { setWalletTab('deposit'); setIsWalletOpen(true); setIsLiveMode(true) }} className="flex flex-col items-center gap-0.5 py-1 text-gray-400">
+          <button onClick={() => { setWalletTab('deposit'); setIsWalletOpen(true); setIsLiveMode(true) }} className={`flex flex-col items-center gap-0.5 py-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
             <Wallet className="w-5 h-5" />
             <span className="text-[10px]">Wallet</span>
           </button>
-          <Link href="/history" className="flex flex-col items-center gap-0.5 py-1 text-gray-400">
+          <Link href="/history" className={`flex flex-col items-center gap-0.5 py-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
             <History className="w-5 h-5" />
             <span className="text-[10px]">History</span>
           </Link>
-          <button className="flex flex-col items-center gap-0.5 py-1 text-gray-400">
+          <button className={`flex flex-col items-center gap-0.5 py-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
             <Gift className="w-5 h-5" />
             <span className="text-[10px]">Refer</span>
           </button>
-          <button onClick={handleLogout} className="flex flex-col items-center gap-0.5 py-1 text-gray-400">
+          <button onClick={handleLogout} className={`flex flex-col items-center gap-0.5 py-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
             <LogOut className="w-5 h-5" />
             <span className="text-[10px]">Log out</span>
           </button>
@@ -962,88 +967,88 @@ export default function HomePage() {
       {/* WALLET MODAL */}
       {isWalletOpen && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <div className="w-full max-w-md rounded-2xl border bg-[#0d0818] border-purple-500/20 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-5 border-b border-purple-500/20">
+          <div className={`w-full max-w-md rounded-2xl border ${isDark ? 'bg-[#0d0818] border-purple-500/20' : 'bg-white border-gray-200'} max-h-[90vh] overflow-y-auto`}>
+            <div className={`flex items-center justify-between p-5 border-b ${isDark ? 'border-purple-500/20' : 'border-gray-200'}`}>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
                   <Wallet className="w-5 h-5 text-purple-500" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-lg text-white">Wallet</h3>
-                  <p className="text-xs text-gray-400">
+                  <h3 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>Wallet</h3>
+                  <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                     {isLiveMode ? `Live · $${liveBalance.toFixed(2)}` : `Demo · $${demoBalance.toFixed(2)}`}
                   </p>
                 </div>
               </div>
-              <button onClick={() => { setIsWalletOpen(false); setWalletMessage(null) }} className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/5">
+              <button onClick={() => { setIsWalletOpen(false); setWalletMessage(null) }} className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'bg-white/5' : 'bg-gray-100'}`}>
                 <X className="w-4 h-4 text-gray-400" />
               </button>
             </div>
             <div className="p-5">
               <div className="flex gap-2 mb-4">
-                <button onClick={() => { setWalletTab('deposit'); setWalletMessage(null) }} className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2 ${walletTab === 'deposit' ? 'bg-purple-600 text-white' : 'text-gray-400'}`}>
+                <button onClick={() => { setWalletTab('deposit'); setWalletMessage(null) }} className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2 ${walletTab === 'deposit' ? 'bg-purple-600 text-white' : (isDark ? 'text-gray-400' : 'text-gray-600')}`}>
                   <ArrowDownToLine className="w-4 h-4" /> Deposit
                 </button>
-                <button onClick={() => { setWalletTab('withdraw'); setWalletMessage(null) }} className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2 ${walletTab === 'withdraw' ? 'bg-purple-600 text-white' : 'text-gray-400'}`}>
+                <button onClick={() => { setWalletTab('withdraw'); setWalletMessage(null) }} className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2 ${walletTab === 'withdraw' ? 'bg-purple-600 text-white' : (isDark ? 'text-gray-400' : 'text-gray-600')}`}>
                   <ArrowUpFromLine className="w-4 h-4" /> Withdraw
                 </button>
               </div>
               <div className="flex gap-2 mb-4">
-                <button onClick={() => { setPaymentMethod('mpesa'); setWalletMessage(null) }} className={`flex-1 py-3 rounded-lg text-sm font-semibold transition ${paymentMethod === 'mpesa' ? 'bg-emerald-600 text-white' : 'bg-[#150d24] text-gray-400'}`}>📱 M-Pesa</button>
-                <button onClick={() => { setPaymentMethod('crypto'); setWalletMessage(null) }} className={`flex-1 py-3 rounded-lg text-sm font-semibold transition ${paymentMethod === 'crypto' ? 'bg-orange-500 text-white' : 'bg-[#150d24] text-gray-400'}`}>₿ Crypto</button>
+                <button onClick={() => { setPaymentMethod('mpesa'); setWalletMessage(null) }} className={`flex-1 py-3 rounded-lg text-sm font-semibold transition ${paymentMethod === 'mpesa' ? 'bg-emerald-600 text-white' : (isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600')}`}>📱 M-Pesa</button>
+                <button onClick={() => { setPaymentMethod('crypto'); setWalletMessage(null) }} className={`flex-1 py-3 rounded-lg text-sm font-semibold transition ${paymentMethod === 'crypto' ? 'bg-orange-500 text-white' : (isDark ? 'bg-[#150d24] text-gray-400' : 'bg-gray-100 text-gray-600')}`}>₿ Crypto</button>
               </div>
               {walletTab === 'deposit' && (
                 <>
                   <div className="mb-4">
-                    <label className="text-xs block mb-2 font-semibold text-gray-400">Amount (USD)</label>
+                    <label className={`text-xs block mb-2 font-semibold ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Amount (USD)</label>
                     <input type="number" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} placeholder="0.00" min={1}
-                      className="w-full rounded-lg px-4 py-3 outline-none border text-sm font-medium bg-[#150d24] text-white border-purple-500/20 focus:border-purple-500" />
+                      className={`w-full rounded-lg px-4 py-3 outline-none border text-sm font-medium ${isDark ? 'bg-[#150d24] text-white border-purple-500/20 focus:border-purple-500' : 'bg-gray-50 text-gray-900 border-gray-200 focus:border-purple-500'}`} />
                     <div className="grid grid-cols-4 gap-2 mt-2">
                       {[10, 50, 100, 500].map((amt) => (
                         <button key={amt} onClick={() => setDepositAmount(String(amt))}
-                          className={`py-2 rounded-lg text-xs font-semibold ${depositAmount === String(amt) ? 'bg-purple-600 text-white' : 'bg-[#150d24] text-gray-300'}`}>${amt}</button>
+                          className={`py-2 rounded-lg text-xs font-semibold ${depositAmount === String(amt) ? 'bg-purple-600 text-white' : (isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700')}`}>${amt}</button>
                       ))}
                     </div>
                   </div>
                   {paymentMethod === 'mpesa' && (
                     <div className="mb-4">
-                      <label className="text-xs block mb-2 font-semibold text-gray-400">M-Pesa Phone Number</label>
+                      <label className={`text-xs block mb-2 font-semibold ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>M-Pesa Phone Number</label>
                       <input type="tel" value={depositPhone} onChange={(e) => setDepositPhone(e.target.value)} placeholder="0712 345 678"
-                        className="w-full rounded-lg px-4 py-3 outline-none border text-sm bg-[#150d24] text-white border-purple-500/20 focus:border-purple-500" />
+                        className={`w-full rounded-lg px-4 py-3 outline-none border text-sm ${isDark ? 'bg-[#150d24] text-white border-purple-500/20 focus:border-purple-500' : 'bg-gray-50 text-gray-900 border-gray-200 focus:border-purple-500'}`} />
                     </div>
                   )}
                   {paymentMethod === 'crypto' && (
                     <>
                       <div className="mb-4">
-                        <label className="text-xs block mb-2 font-semibold text-gray-400">Select Coin</label>
+                        <label className={`text-xs block mb-2 font-semibold ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Select Coin</label>
                         <div className="grid grid-cols-3 gap-2">
                           {['USDT', 'BTC', 'ETH'].map((coin) => (
                             <button key={coin} onClick={() => setCryptoCoin(coin)}
-                              className={`py-2 rounded-lg text-xs font-semibold ${cryptoCoin === coin ? 'bg-orange-500 text-white' : 'bg-[#150d24] text-gray-300'}`}>{coin}</button>
+                              className={`py-2 rounded-lg text-xs font-semibold ${cryptoCoin === coin ? 'bg-orange-500 text-white' : (isDark ? 'bg-[#150d24] text-gray-300' : 'bg-gray-100 text-gray-700')}`}>{coin}</button>
                           ))}
                         </div>
                       </div>
-                      <div className="mb-3 p-2.5 rounded-lg text-xs border bg-amber-500/10 border-amber-500/30 text-amber-500">
+                      <div className="mb-3 p-2.5 rounded-lg text-xs border bg-amber-50 border-amber-200 text-amber-800">
                         ⚠️ <b>Network: {CRYPTO_NETWORKS[cryptoCoin]}</b> — send only on this network or funds will be lost.
                       </div>
-                      <div className="p-3 rounded-lg mb-4 bg-[#150d24]">
-                        <div className="text-xs mb-2 text-gray-400">Send {cryptoCoin} to:</div>
+                      <div className={`p-3 rounded-lg mb-4 ${isDark ? 'bg-[#150d24]' : 'bg-gray-50'}`}>
+                        <div className={`text-xs mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Send {cryptoCoin} to:</div>
                         <div className="flex items-center gap-2">
-                          <div className="flex-1 text-xs font-mono break-all text-white">{CRYPTO_ADDRESSES[cryptoCoin]}</div>
+                          <div className={`flex-1 text-xs font-mono break-all ${isDark ? 'text-white' : 'text-gray-900'}`}>{CRYPTO_ADDRESSES[cryptoCoin]}</div>
                           <button onClick={() => copyToClipboard(CRYPTO_ADDRESSES[cryptoCoin])} className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center flex-shrink-0">
                             {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4 text-purple-500" />}
                           </button>
                         </div>
                       </div>
                       <div className="mb-4">
-                        <label className="text-xs block mb-2 font-semibold text-gray-400">Transaction hash</label>
+                        <label className={`text-xs block mb-2 font-semibold ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Transaction hash</label>
                         <input type="text" value={cryptoTxHash} onChange={(e) => setCryptoTxHash(e.target.value)} placeholder="Paste your TX hash here"
-                          className="w-full rounded-lg px-4 py-3 outline-none border text-sm font-mono bg-[#150d24] text-white border-purple-500/20 focus:border-purple-500" />
+                          className={`w-full rounded-lg px-4 py-3 outline-none border text-sm font-mono ${isDark ? 'bg-[#150d24] text-white border-purple-500/20 focus:border-purple-500' : 'bg-gray-50 text-gray-900 border-gray-200 focus:border-purple-500'}`} />
                       </div>
                     </>
                   )}
                   {walletMessage && (
-                    <div className={`mb-4 p-3 rounded-lg text-sm ${walletMessage.includes('✅') ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : 'bg-red-500/10 text-red-400 border border-red-500/30'}`}>{walletMessage}</div>
+                    <div className={`mb-4 p-3 rounded-lg text-sm ${walletMessage.includes('✅') ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/30' : 'bg-red-500/10 text-red-500 border border-red-500/30'}`}>{walletMessage}</div>
                   )}
                   <button onClick={paymentMethod === 'mpesa' ? handleMpesaDeposit : handleCryptoDeposit}
                     disabled={isProcessing || !depositAmount || (paymentMethod === 'crypto' && !cryptoTxHash)}
@@ -1055,27 +1060,27 @@ export default function HomePage() {
               {walletTab === 'withdraw' && (
                 <>
                   <div className="mb-4">
-                    <label className="text-xs block mb-2 font-semibold text-gray-400">Amount (USD)</label>
+                    <label className={`text-xs block mb-2 font-semibold ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Amount (USD)</label>
                     <input type="number" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} placeholder="0.00" min={1}
-                      className="w-full rounded-lg px-4 py-3 outline-none border text-sm font-medium bg-[#150d24] text-white border-purple-500/20" />
-                    <p className="text-xs mt-2 text-gray-500">Available: ${liveBalance.toFixed(2)}</p>
+                      className={`w-full rounded-lg px-4 py-3 outline-none border text-sm font-medium ${isDark ? 'bg-[#150d24] text-white border-purple-500/20' : 'bg-gray-50 text-gray-900 border-gray-200'}`} />
+                    <p className={`text-xs mt-2 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Available: ${liveBalance.toFixed(2)}</p>
                   </div>
                   {paymentMethod === 'mpesa' && (
                     <div className="mb-4">
-                      <label className="text-xs block mb-2 font-semibold text-gray-400">M-Pesa Phone</label>
+                      <label className={`text-xs block mb-2 font-semibold ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>M-Pesa Phone</label>
                       <input type="tel" value={withdrawPhone} onChange={(e) => setWithdrawPhone(e.target.value)} placeholder="0712 345 678"
-                        className="w-full rounded-lg px-4 py-3 outline-none border text-sm bg-[#150d24] text-white border-purple-500/20" />
+                        className={`w-full rounded-lg px-4 py-3 outline-none border text-sm ${isDark ? 'bg-[#150d24] text-white border-purple-500/20' : 'bg-gray-50 text-gray-900 border-gray-200'}`} />
                     </div>
                   )}
                   {paymentMethod === 'crypto' && (
                     <div className="mb-4">
-                      <label className="text-xs block mb-2 font-semibold text-gray-400">Your {cryptoCoin} Address</label>
+                      <label className={`text-xs block mb-2 font-semibold ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Your {cryptoCoin} Address</label>
                       <input type="text" value={withdrawAddress} onChange={(e) => setWithdrawAddress(e.target.value)} placeholder="Paste your wallet address"
-                        className="w-full rounded-lg px-4 py-3 outline-none border text-sm font-mono bg-[#150d24] text-white border-purple-500/20" />
+                        className={`w-full rounded-lg px-4 py-3 outline-none border text-sm font-mono ${isDark ? 'bg-[#150d24] text-white border-purple-500/20' : 'bg-gray-50 text-gray-900 border-gray-200'}`} />
                     </div>
                   )}
                   {walletMessage && (
-                    <div className={`mb-4 p-3 rounded-lg text-sm ${walletMessage.includes('✅') ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : 'bg-red-500/10 text-red-400 border border-red-500/30'}`}>{walletMessage}</div>
+                    <div className={`mb-4 p-3 rounded-lg text-sm ${walletMessage.includes('✅') ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/30' : 'bg-red-500/10 text-red-500 border border-red-500/30'}`}>{walletMessage}</div>
                   )}
                   <button onClick={handleWithdraw} disabled={isProcessing || !withdrawAmount || parseFloat(withdrawAmount) > liveBalance}
                     className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-xl font-bold text-sm">
@@ -1091,21 +1096,21 @@ export default function HomePage() {
       {/* AI SCANNER */}
       {tradeMode === 'ai' && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <div className="w-full max-w-md rounded-2xl border bg-[#0d0818] border-[#1f1433]">
-            <div className="flex items-start justify-between p-5 border-b border-[#1f1433]">
+          <div className={`w-full max-w-md rounded-2xl border ${isDark ? 'bg-[#0d0818] border-[#1f1433]' : 'bg-white border-gray-200'}`}>
+            <div className={`flex items-start justify-between p-5 border-b ${isDark ? 'border-[#1f1433]' : 'border-gray-200'}`}>
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center"><Sparkles className="w-5 h-5 text-purple-500" /></div>
                 <div>
-                  <h3 className="font-bold text-lg text-white">Entry Scanner</h3>
-                  <p className="text-xs text-gray-500">Deep-scans 10 markets for the best entry</p>
+                  <h3 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>Entry Scanner</h3>
+                  <p className={`text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Deep-scans 10 markets for the best entry</p>
                 </div>
               </div>
-              <button onClick={() => setTradeMode('manual')} className="w-8 h-8 rounded-lg flex items-center justify-center bg-[#150d24]"><X className="w-4 h-4 text-gray-400" /></button>
+              <button onClick={() => setTradeMode('manual')} className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'bg-[#150d24]' : 'bg-gray-100'}`}><X className="w-4 h-4 text-gray-400" /></button>
             </div>
             <div className="p-5">
               <div className="mb-4">
-                <label className="text-xs block mb-2 font-semibold text-gray-400">Trade type</label>
-                <select value={aiTradeType} onChange={(e) => setAiTradeType(e.target.value)} className="w-full rounded-lg px-4 py-3 outline-none border text-sm font-medium bg-[#150d24] text-white border-[#1f1433]">
+                <label className={`text-xs block mb-2 font-semibold ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Trade type</label>
+                <select value={aiTradeType} onChange={(e) => setAiTradeType(e.target.value)} className={`w-full rounded-lg px-4 py-3 outline-none border text-sm font-medium ${isDark ? 'bg-[#150d24] text-white border-[#1f1433]' : 'bg-gray-50 text-gray-900 border-gray-200'}`}>
                   <option>Match / Differ</option><option>Over / Under</option><option>Even / Odd</option><option>Rise / Fall</option>
                 </select>
               </div>
@@ -1113,18 +1118,18 @@ export default function HomePage() {
                 <>
                   <div className="mb-4 p-5 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-center">
                     <div className="w-14 h-14 mx-auto rounded-full bg-purple-500/20 flex items-center justify-center mb-3 animate-pulse"><Sparkles className="w-6 h-6 text-purple-500" /></div>
-                    <div className="text-white font-bold">Deep scanning</div>
+                    <div className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Deep scanning</div>
                   </div>
                   <div className="mb-4">
                     <div className="flex justify-between items-center mb-2"><span className="text-xs text-gray-500">Analyzing...</span><span className="text-xs font-medium text-gray-400">{aiScanProgress}/10</span></div>
-                    <div className="h-1.5 rounded-full overflow-hidden bg-[#150d24]"><div className="h-full bg-purple-500 transition-all" style={{ width: `${(aiScanProgress / 10) * 100}%` }} /></div>
+                    <div className={`h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-[#150d24]' : 'bg-gray-200'}`}><div className="h-full bg-purple-500 transition-all" style={{ width: `${(aiScanProgress / 10) * 100}%` }} /></div>
                   </div>
                 </>
               )}
               {!aiScanning && aiScanProgress === 10 && (
                 <>
                   <button onClick={runDeepScan} className="w-full py-3.5 bg-purple-600 text-white rounded-xl font-bold text-sm mb-3">Re-scan</button>
-                  <button onClick={loadScannerBot} className="w-full py-3.5 rounded-xl font-bold text-sm bg-[#150d24] text-purple-400 border border-purple-500/30">Load {aiBestMarket} Bot</button>
+                  <button onClick={loadScannerBot} className={`w-full py-3.5 rounded-xl font-bold text-sm border ${isDark ? 'bg-[#150d24] text-purple-400 border-purple-500/30' : 'bg-purple-50 text-purple-600 border-purple-200'}`}>Load {aiBestMarket} Bot</button>
                 </>
               )}
               {!aiScanning && aiScanProgress === 0 && (
