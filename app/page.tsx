@@ -506,7 +506,12 @@ export default function HomePage() {
     return () => { cancelled = true; clearInterval(interval) }
   }, [isBotRunning, tradeMode, botTrade, martingale, maxRuns, targetProfit, stopLoss])
 
-  const handleLogout = async () => { await supabase.auth.signOut(); setShowDashboard(false) }
+  const handleLogout = async () => { 
+    await supabase.auth.signOut(); 
+    setShowDashboard(false); 
+    setUser(null); 
+  }
+  
   const resetDemo = async () => {
     setDemoBalance(10000)
     if (user?.id) await supabase.from('balances').update({ demo_balance: 10000 }).eq('user_id', user.id)
@@ -703,9 +708,14 @@ export default function HomePage() {
             >
               <ArrowDownToLine className="w-4 h-4" /> Deposit
             </button>
-            <div className="w-9 h-9 rounded-full bg-purple-600 flex items-center justify-center text-white font-bold text-sm ml-1">
+            {/* FIXED: Avatar is now clickable to logout */}
+            <button 
+              onClick={handleLogout}
+              className="w-9 h-9 rounded-full bg-purple-600 flex items-center justify-center text-white font-bold text-sm ml-1 hover:bg-purple-700 transition"
+              title="Click to log out"
+            >
               {userInitial}
-            </div>
+            </button>
           </div>
         </div>
       </nav>
