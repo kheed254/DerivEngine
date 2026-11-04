@@ -12,14 +12,12 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [message, setMessage] = useState<string | null>(null)
   const router = useRouter()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
-    setMessage(null)
 
     const { error } = await supabase.auth.signInWithPassword({ email, password })
 
@@ -32,94 +30,81 @@ export default function LoginPage() {
     setLoading(false)
   }
 
-  const handleForgotPassword = async () => {
-    if (!email) {
-      setError('Please enter your email address first.')
-      return
-    }
-    setLoading(true)
-    setError(null)
-    setMessage(null)
-
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/update-password`,
-    })
-
-    if (error) {
-      setError(error.message)
-    } else {
-      setMessage('Password reset link sent! Check your email.')
-    }
-    setLoading(false)
-  }
-
   return (
-    <main className="min-h-screen bg-[#0a0613] flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-[#150d24] border border-purple-500/20 rounded-2xl p-8">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-emerald-400 mb-2">DerivEngine</h1>
-          <p className="text-gray-400">Sign in to your account</p>
+    <main className="min-h-screen bg-[#f8f9fc] flex items-center justify-center p-4">
+      <div className="w-full max-w-[420px] bg-white rounded-3xl shadow-xl shadow-gray-200/50 p-8">
+        
+        {/* Logo */}
+        <div className="flex items-center gap-2 mb-8">
+          <div className="w-8 h-8 rounded-lg bg-[#7c3aed] flex items-center justify-center">
+            <span className="text-white font-bold text-lg italic">~</span>
+          </div>
+          <span className="font-bold text-xl text-gray-900 tracking-tight">SinTrades</span>
         </div>
 
-        {error && <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg text-sm">{error}</div>}
-        {message && <div className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-lg text-sm">{message}</div>}
+        {/* Title */}
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Welcome back</h1>
+        <p className="text-sm text-gray-500 mb-6 leading-relaxed">
+          Sign in to your account to continue.
+        </p>
 
+        {/* Form */}
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Email</label>
             <input
               type="email"
+              placeholder="Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full bg-[#0d0818] border border-purple-500/20 rounded-lg px-4 py-3 text-white focus:border-purple-500 outline-none"
+              className="w-full bg-[#f8f9fc] border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] outline-none transition"
             />
           </div>
 
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Password</label>
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}
+                placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full bg-[#0d0818] border border-purple-500/20 rounded-lg px-4 py-3 pr-10 text-white focus:border-purple-500 outline-none"
+                className="w-full bg-[#f8f9fc] border border-gray-200 rounded-xl px-4 py-3 pr-10 text-sm text-gray-900 focus:border-[#7c3aed] focus:ring-1 focus:ring-[#7c3aed] outline-none transition"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
               >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
-            <div className="text-right mt-1">
-              <button
-                type="button"
-                onClick={handleForgotPassword}
-                className="text-xs text-purple-400 hover:text-purple-300 transition"
-              >
+            <div className="text-right mt-2">
+              <Link href="/forgot-password" className="text-xs text-[#7c3aed] hover:text-[#6d28d9] font-medium transition">
                 Forgot password?
-              </button>
+              </Link>
             </div>
           </div>
+
+          {error && <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm">{error}</div>}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-lg transition disabled:opacity-50"
+            className="w-full bg-[#7c3aed] hover:bg-[#6d28d9] text-white font-semibold py-3 rounded-xl transition disabled:opacity-50"
           >
-            {loading ? 'Loading...' : 'Sign In'}
+            {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
 
-        <p className="text-center text-sm text-gray-400 mt-6">
+        {/* Footer */}
+        <div className="text-center mt-6 text-sm text-gray-500">
           Don't have an account?{' '}
-          <Link href="/register" className="text-emerald-400 hover:underline">
+          <Link href="/register" className="text-[#7c3aed] font-medium hover:underline">
             Sign up
           </Link>
-        </p>
+        </div>
+
       </div>
     </main>
   )
