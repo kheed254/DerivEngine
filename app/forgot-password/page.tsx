@@ -32,12 +32,12 @@ export default function ForgotPasswordPage() {
     <main className="min-h-screen bg-[#f8f9fc] flex items-center justify-center p-4">
       <div className="w-full max-w-[420px] bg-white rounded-3xl shadow-xl shadow-gray-200/50 p-8">
         
-        {/* Logo */}
+        {/* Logo - CHANGED TO DERIVENGINE */}
         <div className="flex items-center gap-2 mb-8">
           <div className="w-8 h-8 rounded-lg bg-[#7c3aed] flex items-center justify-center">
             <span className="text-white font-bold text-lg italic">~</span>
           </div>
-          <span className="font-bold text-xl text-gray-900 tracking-tight">SinTrades</span>
+          <span className="font-bold text-xl text-gray-900 tracking-tight">DerivEngine</span>
         </div>
 
         {/* Title */}
