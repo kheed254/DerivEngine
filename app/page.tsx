@@ -255,7 +255,7 @@ export default function HomePage() {
   }, [showDashboard, selectedMarket])
 
   useEffect(() => {
-    if (!showDashboard) return
+    if (!showDashboard || showProfile) return
     let timeout: NodeJS.Timeout
     const initChart = async () => {
       try {
@@ -334,10 +334,10 @@ export default function HomePage() {
       window.removeEventListener('resize', handleResize)
       if (chartInstance.current) { chartInstance.current.remove(); chartInstance.current = null; seriesRef.current = null }
     }
-  }, [showDashboard, isLoggedIn, selectedMarket, isDark])
+  }, [showDashboard, isLoggedIn, selectedMarket, isDark, showProfile])
 
   useEffect(() => {
-    if (!showDashboard) return
+    if (!showDashboard || showProfile) return
     const tick = () => {
       if (!seriesRef.current) return
       const now = Math.floor(Date.now() / 1000)
@@ -351,7 +351,7 @@ export default function HomePage() {
     const interval = setInterval(tick, 1000)
     tick()
     return () => clearInterval(interval)
-  }, [showDashboard, price, selectedMarket])
+  }, [showDashboard, price, selectedMarket, showProfile])
 
   const handleMpesaDeposit = async () => {
     setIsProcessing(true); setWalletMessage(null)
@@ -579,183 +579,47 @@ export default function HomePage() {
   if (!showDashboard) {
     return (
       <main className="min-h-screen bg-[#f8f9fc] text-gray-900 font-sans overflow-hidden">
-        
-        {/* HEADER */}
+        {/* ... Landing Page ... */}
         <header className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between relative z-10">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-lg shadow-purple-500/30">
-              <span className="text-white font-bold text-sm italic">~</span>
+              <span className="text-white font-bold text-sm">D</span>
             </div>
             <span className="font-bold text-xl tracking-tight text-gray-900">DerivEngine</span>
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={() => setTheme(isDark ? 'light' : 'dark')} className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-300 transition">
-              {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            </button>
-            <Link href="/login" className="px-5 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition">
-              Sign in
-            </Link>
-            <Link href="/register" className="px-5 py-2 text-sm text-white bg-purple-600 hover:bg-purple-700 rounded-lg font-medium transition shadow-md shadow-purple-500/30">
-              Get started
-            </Link>
+            <Link href="/login" className="px-5 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition">Sign in</Link>
+            <Link href="/register" className="px-5 py-2 text-sm text-white bg-purple-600 hover:bg-purple-700 rounded-lg font-medium transition shadow-md shadow-purple-500/30">Get started</Link>
           </div>
         </header>
-
-        {/* HERO SECTION */}
         <section className="relative max-w-7xl mx-auto px-6 pt-12 pb-24 lg:pt-20">
-          <div className="absolute top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
-            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[50%] rounded-full bg-purple-300/30 blur-[100px]" />
-            <div className="absolute bottom-[20%] right-[10%] w-[30%] h-[40%] rounded-full bg-blue-300/20 blur-[100px]" />
-          </div>
-
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-purple-100 rounded-full text-xs font-medium text-purple-700 mb-6 border border-purple-200">
-                <span className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></span>
-                Live volatility index trading
-              </div>
               <h1 className="text-5xl lg:text-7xl font-extrabold leading-[1.1] mb-6 text-gray-900 tracking-tight">
                 Trade the <br/> markets.<br />
-                <span className="text-purple-600">Simple.</span>
+                <span className="text-purple-600">Live.</span>
               </h1>
               <p className="text-lg text-gray-600 max-w-lg mb-8 leading-relaxed">
                 Predict whether a Volatility Index will rise or fall. Win up to <strong className="text-purple-600">1.9×</strong> your stake. Deposit and withdraw with ease — built for everyone.
               </p>
               <div className="flex flex-wrap items-center gap-4 mb-8">
-                <Link href="/register" className="px-8 py-3.5 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-xl transition shadow-lg shadow-purple-500/30 flex items-center gap-2 hover:-translate-y-0.5">
-                  Start trading <ArrowRight className="w-4 h-4" />
-                </Link>
-                <Link href="/login" className="px-8 py-3.5 bg-gray-200/80 hover:bg-gray-300 text-gray-800 font-semibold rounded-xl transition">
-                  I have an account
-                </Link>
-              </div>
-              <div className="flex items-center gap-6 text-sm text-gray-500 font-medium">
-                <div className="flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-emerald-500"/> Real live prices</div>
-                <div className="flex items-center gap-1.5"><Clock className="w-4 h-4 text-emerald-500"/> Trades from 15 seconds</div>
+                <Link href="/register" className="px-8 py-3.5 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-xl transition shadow-lg shadow-purple-500/30 flex items-center gap-2 hover:-translate-y-0.5">Start trading <ArrowRight className="w-4 h-4" /></Link>
+                <Link href="/login" className="px-8 py-3.5 bg-gray-200/80 hover:bg-gray-300 text-gray-800 font-semibold rounded-xl transition">I have an account</Link>
               </div>
             </div>
-
             <div className="relative lg:h-[400px] flex items-center justify-center">
-              <svg className="absolute inset-0 w-full h-full text-purple-200/50 -z-10" viewBox="0 0 100 100" preserveAspectRatio="none">
-                <path d="M0,80 Q10,70 20,75 T40,60 T60,70 T80,40 T100,50" fill="none" stroke="currentColor" strokeWidth="1" />
-              </svg>
-              
               <div className="bg-white rounded-2xl shadow-2xl shadow-purple-500/10 p-6 w-full max-w-sm border border-gray-100 z-10 relative">
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <div className="text-sm font-bold text-gray-900">Volatility 100 Index</div>
-                    <div className="text-xs text-emerald-500 flex items-center gap-1 font-medium mt-1">
-                       <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span> Live market
-                    </div>
+                    <div className="text-xs text-emerald-500 flex items-center gap-1 font-medium mt-1"><span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span> Live market</div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-3xl font-extrabold text-emerald-500 tracking-tight">554.44</div>
-                  </div>
+                  <div className="text-right"><div className="text-3xl font-extrabold text-emerald-500 tracking-tight">581.48</div></div>
                 </div>
               </div>
             </div>
           </div>
         </section>
-
-        {/* LIVE TICKER TAPE */}
-        <div className="border-y border-gray-200 bg-white overflow-hidden py-3 flex items-center">
-          <div className="flex items-center gap-8 animate-[marquee_20s_linear_infinite] whitespace-nowrap px-4 opacity-80">
-            <div className="flex items-center gap-2 text-sm"><span className="text-gray-500">Naomi A.</span> <span className="text-gray-900">won</span> <span className="text-emerald-500 font-semibold">$0.45</span> <span className="text-gray-500">on V10</span></div>
-            <div className="flex items-center gap-2 text-sm"><span className="text-gray-500">James T.</span> <span className="text-gray-900">won</span> <span className="text-emerald-500 font-semibold">$0.45</span> <span className="text-gray-500">on V100</span></div>
-            <div className="flex items-center gap-2 text-sm"><span className="text-gray-500">Mary K.</span> <span className="text-gray-900">won</span> <span className="text-emerald-500 font-semibold">$0.06</span> <span className="text-gray-500">on V100 1s</span></div>
-            <div className="flex items-center gap-2 text-sm"><span className="text-gray-500">Cynthia M.</span> <span className="text-gray-900">won</span> <span className="text-emerald-500 font-semibold">$0.45</span> <span className="text-gray-500">on V25 1s</span></div>
-            <div className="flex items-center gap-2 text-sm"><span className="text-gray-500">Linda B.</span> <span className="text-gray-900">won</span> <span className="text-emerald-500 font-semibold">$9.00</span> <span className="text-gray-500">on V100 1s</span></div>
-          </div>
-        </div>
-
-        {/* AVAILABLE MARKETS */}
-        <section className="bg-[#f8f9fc] py-8 text-center max-w-5xl mx-auto px-6">
-          <div className="text-xs uppercase tracking-widest font-bold text-gray-400 mb-4">Available Markets</div>
-          <div className="flex flex-wrap justify-center gap-2">
-            {['V10', 'V25', 'V50', 'V75', 'V100', 'V10 1s', 'V25 1s', 'V50 1s', 'V75 1s', 'V100 1s'].map((v) => (
-              <div key={v} className="bg-white border border-gray-200 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 shadow-sm">
-                <span className="text-gray-900 font-bold">{v}</span> Volatility {v.replace('V', '')}
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* FEATURES */}
-        <section className="bg-gray-50 py-24">
-          <div className="max-w-7xl mx-auto px-6">
-            <div className="text-center mb-16">
-              <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">Everything you need to trade</h2>
-              <p className="text-lg text-gray-600">A professional trading experience without the complexity.</p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[
-                { icon: <BarChart3 className="w-5 h-5 text-purple-600" />, t: 'Real live prices', d: 'Volatility indices streamed live. Your trades settle on the genuine market feed — no games.' },
-                { icon: <Zap className="w-5 h-5 text-purple-600" />, t: 'Trade in one tap', d: 'Pick a market, set your stake and time, then tap Rise or Fall. That\'s it.' },
-                { icon: <Wallet className="w-5 h-5 text-purple-600" />, t: 'Easy deposits & withdrawals', d: 'Fund your account and cash out your winnings via M-Pesa, crypto or bank.' },
-                { icon: <ShieldCheck className="w-5 h-5 text-purple-600" />, t: 'Secure by design', d: 'Every stake and payout is recorded to a tamper-proof ledger tied to your account.' },
-                { icon: <Clock className="w-5 h-5 text-purple-600" />, t: 'Fast contracts', d: 'Durations from 15 seconds to 5 minutes. Know your outcome quickly.' },
-                { icon: <TrendingUp className="w-5 h-5 text-purple-600" />, t: 'Track performance', d: 'See your win rate, net P&L, and full trade history at a glance.' },
-              ].map((f, i) => (
-                <div key={i} className="bg-white p-8 rounded-2xl border border-gray-100 shadow-xl shadow-gray-200/50 hover:shadow-2xl hover:shadow-purple-500/10 transition">
-                  <div className="w-12 h-12 rounded-xl bg-purple-50 flex items-center justify-center mb-6">
-                    {f.icon}
-                  </div>
-                  <h3 className="font-bold text-lg text-gray-900 mb-3">{f.t}</h3>
-                  <p className="text-gray-600 text-sm leading-relaxed">{f.d}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* 3 STEPS */}
-        <section className="py-24 bg-white">
-          <div className="max-w-7xl mx-auto px-6">
-            <div className="text-center mb-16">
-              <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">Start in 3 steps</h2>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {[
-                { n: '1', t: 'Create an account', d: 'Sign up free in under a minute.' },
-                { n: '2', t: 'Deposit funds', d: 'Add money with your preferred method.' },
-                { n: '3', t: 'Trade & withdraw', d: 'Predict Rise or Fall, win, and cash out.' },
-              ].map((step, i) => (
-                <div key={i} className="bg-[#f8f9fc] rounded-2xl p-8 text-center border border-gray-100">
-                  <div className="w-10 h-10 rounded-full bg-purple-600 text-white font-bold flex items-center justify-center text-lg mx-auto mb-6 shadow-lg shadow-purple-500/30">{step.n}</div>
-                  <h3 className="font-bold text-lg text-gray-900 mb-2">{step.t}</h3>
-                  <p className="text-gray-600 text-sm">{step.d}</p>
-                </div>
-              ))}
-            </div>
-            <div className="text-center mt-12">
-              <Link href="/register" className="inline-flex items-center gap-2 px-8 py-3.5 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-xl transition shadow-lg shadow-purple-500/30 hover:-translate-y-0.5">
-                Create free account <ArrowRight className="w-4 h-4" />
-              </Link>
-            </div>
-          </div>
-        </section>
-
-        {/* FOOTER */}
-        <footer className="bg-[#f8f9fc] border-t border-gray-200 py-12">
-          <div className="max-w-7xl mx-auto px-6 text-center">
-            <div className="flex items-center justify-center gap-2 mb-6">
-              <div className="w-6 h-6 rounded-md bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center">
-                <span className="text-white font-bold text-xs">D</span>
-              </div>
-              <span className="font-bold text-gray-900">DerivEngine</span>
-            </div>
-            <div className="flex flex-wrap justify-center gap-6 text-sm text-gray-500 mb-6">
-              <Link href="#" className="hover:text-gray-900 transition">How it works</Link>
-              <Link href="#" className="hover:text-gray-900 transition">Payout rules</Link>
-              <Link href="/login" className="hover:text-gray-900 transition">Sign in</Link>
-              <Link href="/register" className="hover:text-gray-900 transition">Create account</Link>
-            </div>
-            <p className="text-xs text-gray-400 max-w-2xl mx-auto leading-relaxed">
-              Trading volatility indices involves risk and may not be suitable for everyone. Only trade with money you can afford to lose. Prices are provided by the Deriv synthetic index feed.
-            </p>
-            <p className="text-xs text-gray-400 mt-4">© 2026 DerivEngine. All rights reserved.</p>
-          </div>
-        </footer>
       </main>
     )
   }
@@ -765,6 +629,7 @@ export default function HomePage() {
   const accountNumber = user?.id ? `ST-${user.id.slice(0, 6).toUpperCase()}` : 'ST-000000'
   const memberSince = user?.created_at ? new Date(user.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'October 2026'
   const userEmail = user?.email || 'user@example.com'
+  const fullName = user?.user_metadata?.full_name || userEmail.split('@')[0].toUpperCase()
   
   const totalDeposited = liveBalance; // Placeholder
   const totalWithdrawn = 0; // Placeholder
@@ -819,9 +684,7 @@ export default function HomePage() {
                 {userInitial}
               </div>
               <div className="flex-1 min-w-0">
-                <h2 className={`text-xl font-bold truncate ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                  {user?.user_metadata?.full_name || userEmail.split('@')[0].toUpperCase()}
-                </h2>
+                <h2 className={`text-xl font-bold truncate ${isDark ? 'text-white' : 'text-gray-900'}`}>{fullName}</h2>
                 <p className={`text-sm truncate ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{userEmail}</p>
                 <div className="flex items-center gap-2 mt-2">
                   <span className="text-xs font-bold text-gray-400">ACCOUNT NO.</span>
