@@ -270,7 +270,7 @@ export default function HomePage() {
         
         const chart = createChart(container, {
           width: container.clientWidth,
-          height: isMobile ? 250 : 400,
+          height: isMobile ? 220 : 400, // 👈 Shorter chart on mobile
           layout: { background: { color: 'transparent' }, textColor: isDark ? '#9ca3af' : '#6b7280' },
           grid: {
             vertLines: { color: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)', style: LineStyle?.Dotted ?? 2 },
@@ -325,7 +325,7 @@ export default function HomePage() {
       const container = chartRef.current
       if (container && chartInstance.current) {
         const isMobile = container.clientWidth < 768
-        chartInstance.current.applyOptions({ width: container.clientWidth, height: isMobile ? 250 : 400 })
+        chartInstance.current.applyOptions({ width: container.clientWidth, height: isMobile ? 220 : 400 })
       }
     }
     window.addEventListener('resize', handleResize)
@@ -847,7 +847,7 @@ export default function HomePage() {
   // DASHBOARD
   // ═══════════════════════════════════════════════════════
   return (
-    <main className={`min-h-screen pb-20 md:pb-0 ${isDark ? 'bg-[#0a0613] text-white' : 'bg-gray-50 text-gray-900'}`}>
+    <main className={`min-h-screen pb-24 md:pb-0 ${isDark ? 'bg-[#0a0613] text-white' : 'bg-gray-50 text-gray-900'}`}>
 
       {/* ── TOP BAR ───────────────────────────── */}
       <nav className={`border-b sticky top-0 z-30 ${isDark ? 'border-[#1f1433] bg-[#0d0818]' : 'border-gray-200 bg-white'}`}>
@@ -979,7 +979,7 @@ export default function HomePage() {
                 </div>
               </div>
             </div>
-            <div ref={chartRef} className="w-full mt-3 rounded-lg overflow-hidden" style={{ height: '250px' }} />
+            <div ref={chartRef} className="w-full mt-3 rounded-lg overflow-hidden" style={{ height: '220px' }} />
           </div>
 
           {/* Digits */}
@@ -1051,8 +1051,8 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2 mb-1">
-              <button onClick={() => setStake(Math.max(1, stake - 1))} className={`w-12 h-14 rounded-xl text-2xl font-bold transition active:scale-95 ${isDark ? 'bg-[#150d24] text-white' : 'bg-gray-100 text-gray-900'}`}>−</button>
+            <div className="flex items-center gap-2 mb-1 min-w-0">
+              <button onClick={() => setStake(Math.max(1, stake - 1))} className={`w-10 h-12 md:w-12 md:h-14 rounded-xl text-xl md:text-2xl font-bold transition active:scale-95 flex-shrink-0 ${isDark ? 'bg-[#150d24] text-white' : 'bg-gray-100 text-gray-900'}`}>−</button>
               <input
                 type="number" 
                 value={displayCurrency === 'USD' ? stake : stake * 130}
@@ -1061,9 +1061,9 @@ export default function HomePage() {
                   setStake(displayCurrency === 'USD' ? Math.max(1, val) : Math.max(1, val / 130));
                 }} 
                 min={1}
-                className={`flex-1 min-w-0 text-center text-2xl font-bold rounded-xl py-3 outline-none border-2 transition ${isDark ? 'bg-[#150d24] text-white border-[#1f1433] focus:border-purple-500' : 'bg-gray-50 text-gray-900 border-gray-200 focus:border-purple-500'}`}
+                className={`flex-1 min-w-0 w-full text-center text-xl md:text-2xl font-bold rounded-xl py-2 md:py-3 outline-none border-2 transition ${isDark ? 'bg-[#150d24] text-white border-[#1f1433] focus:border-purple-500' : 'bg-gray-50 text-gray-900 border-gray-200 focus:border-purple-500'}`}
               />
-              <button onClick={() => setStake(stake + 1)} className={`w-12 h-14 rounded-xl text-2xl font-bold transition active:scale-95 ${isDark ? 'bg-[#150d24] text-white' : 'bg-gray-100 text-gray-900'}`}>+</button>
+              <button onClick={() => setStake(stake + 1)} className={`w-10 h-12 md:w-12 md:h-14 rounded-xl text-xl md:text-2xl font-bold transition active:scale-95 flex-shrink-0 ${isDark ? 'bg-[#150d24] text-white' : 'bg-gray-100 text-gray-900'}`}>+</button>
             </div>
             <div className="text-right text-[11px] mb-3 text-gray-500">
               {displayCurrency === 'USD' ? `≈ KES ${(stake * 130).toLocaleString()}` : `≈ USD $${(stake / 130).toFixed(2)}`}
