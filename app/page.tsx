@@ -38,6 +38,11 @@ export default function HomePage() {
   const [showProfile, setShowProfile] = useState(false)
   const [digitTickCount, setDigitTickCount] = useState(0)
 
+  // PHONE MODAL STATE
+  const [isPhoneModalOpen, setIsPhoneModalOpen] = useState(false)
+  const [newPhoneNumber, setNewPhoneNumber] = useState('')
+  const [isUpdatingPhone, setIsUpdatingPhone] = useState(false)
+
   const [isWalletOpen, setIsWalletOpen] = useState(false)
   const [walletTab, setWalletTab] = useState<'deposit' | 'withdraw'>('deposit')
   const [paymentMethod, setPaymentMethod] = useState<'mpesa' | 'crypto'>('mpesa')
@@ -270,7 +275,7 @@ export default function HomePage() {
         
         const chart = createChart(container, {
           width: container.clientWidth,
-          height: isMobile ? 220 : 400, // 👈 Shorter chart on mobile
+          height: isMobile ? 220 : 400,
           layout: { background: { color: 'transparent' }, textColor: isDark ? '#9ca3af' : '#6b7280' },
           grid: {
             vertLines: { color: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)', style: LineStyle?.Dotted ?? 2 },
@@ -576,6 +581,28 @@ export default function HomePage() {
     });
   }
 
+  // Update phone number function
+  const handleUpdatePhone = async () => {
+    if (!newPhoneNumber || newPhoneNumber.length < 10) {
+      alert("Please enter a valid phone number")
+      return
+    }
+    setIsUpdatingPhone(true)
+    const { error } = await supabase.auth.updateUser({
+      data: { phone: newPhoneNumber }
+    })
+    
+    if (error) {
+      alert(error.message)
+    } else {
+      // Update local state to reflect change immediately
+      setUser({ ...user, user_metadata: { ...user.user_metadata, phone: newPhoneNumber } })
+      setIsPhoneModalOpen(false)
+      setNewPhoneNumber('')
+    }
+    setIsUpdatingPhone(false)
+  }
+
   if (!showDashboard) {
     return (
       <main className="min-h-screen bg-[#f8f9fc] text-gray-900 font-sans overflow-hidden">
@@ -765,11 +792,19 @@ export default function HomePage() {
                 <Phone className="w-4 h-4 text-purple-500" />
               </div>
               <div>
-                <div className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{user?.phone || '0119124884'}</div>
+                <div className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                  {user?.user_metadata?.phone || user?.phone || 'Not set'}
+                </div>
                 <div className="text-xs text-gray-500 mt-1">Used to authorize your M-Pesa deposits & withdrawals.</div>
               </div>
             </div>
-            <button className={`px-4 py-2 rounded-lg text-sm font-semibold border ${isDark ? 'border-[#2a1b40] hover:bg-white/5' : 'border-gray-200 hover:bg-gray-50'}`}>
+            <button 
+              onClick={() => {
+                setNewPhoneNumber(user?.user_metadata?.phone || '');
+                setIsPhoneModalOpen(true);
+              }}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold border transition ${isDark ? 'border-[#2a1b40] hover:bg-white/5' : 'border-gray-200 hover:bg-gray-50'}`}
+            >
               Change number
             </button>
           </div>
@@ -839,6 +874,40 @@ export default function HomePage() {
             </button>
           </div>
         </div>
+
+        {/* CHANGE PHONE MODAL */}
+        {isPhoneModalOpen && (
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+            <div className={`w-full max-w-sm rounded-2xl border p-6 ${isDark ? 'bg-[#0d0818] border-purple-500/20' : 'bg-white border-gray-200'}`}>
+              <h3 className={`font-bold text-lg mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>Change Phone Number</h3>
+              <div className="mb-4">
+                <label className={`text-xs block mb-2 font-semibold ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>New Phone Number</label>
+                <input 
+                  type="tel" 
+                  value={newPhoneNumber} 
+                  onChange={(e) => setNewPhoneNumber(e.target.value)} 
+                  placeholder="0712 345 678"
+                  className={`w-full rounded-lg px-4 py-3 outline-none border text-sm ${isDark ? 'bg-[#150d24] text-white border-purple-500/20 focus:border-purple-500' : 'bg-gray-50 text-gray-900 border-gray-200 focus:border-purple-500'}`} 
+                />
+              </div>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setIsPhoneModalOpen(false)} 
+                  className={`flex-1 py-2.5 rounded-lg font-semibold text-sm ${isDark ? 'bg-[#150d24] text-white' : 'bg-gray-100 text-gray-700'}`}
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={handleUpdatePhone} 
+                  disabled={isUpdatingPhone}
+                  className="flex-1 py-2.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg font-bold text-sm"
+                >
+                  {isUpdatingPhone ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     )
   }
