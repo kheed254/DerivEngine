@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { DerivClient } from '@/lib/derivClient'
-import { ChevronDown, LogOut, Clock, Zap, Play, X, Search, Sparkles, Copy, Check, Wallet, ArrowDownToLine, ArrowUpFromLine, TrendingUp, History, Gift, BarChart3, ShieldCheck, ArrowRight, Bell, Sun, Moon, Mail, Globe, Hash, Calendar, Phone, AlertCircle } from 'lucide-react'
+import { ChevronDown, LogOut, Clock, Zap, X, Sparkles, Copy, Check, Wallet, ArrowDownToLine, ArrowUpFromLine, TrendingUp, History, Gift, BarChart3, ShieldCheck, ArrowRight, Bell, Sun, Moon, Mail, Globe, Hash, Calendar, Phone, AlertCircle, Play, Square } from 'lucide-react'
 
 export default function HomePage() {
   const [price, setPrice] = useState(730.69)
@@ -220,9 +220,6 @@ export default function HomePage() {
       if (derivConnected) return
       setPrice((prev) => {
         const next = Math.max(100, prev + (Math.random() - 0.5) * 2)
-        const d = Math.floor(next * 100) % 10
-        setLastDigit(d)
-        recordDigit(d)
         setPrevPrice(prev)
         return next
       })
@@ -236,9 +233,6 @@ export default function HomePage() {
           derivConnected = true
           setIsDerivConnected(true)
           updatePrice(newPrice)
-          const d = Math.floor(newPrice * 100) % 10
-          setLastDigit(d)
-          recordDigit(d)
         })
         await Promise.race([
           derivClient.subscribeToTicks('1HZ100V'),
@@ -258,6 +252,13 @@ export default function HomePage() {
       if (derivClient) derivClient.unsubscribeFromTicks()
     }
   }, [showDashboard, selectedMarket])
+
+  // Record digit whenever price changes (moved out of setPrice updater)
+  useEffect(() => {
+    const d = Math.floor(price * 100) % 10
+    setLastDigit(d)
+    recordDigit(d)
+  }, [price])
 
   useEffect(() => {
     if (!showDashboard || showProfile) return
@@ -301,6 +302,8 @@ export default function HomePage() {
             bottomColor: 'rgba(16, 185, 129, 0.0)', 
             lineWidth: 2 
           })
+        } else {
+          console.warn('⚠️ No compatible area series method on chart')
         }
         
         const basePrices: { [key: string]: number } = {
@@ -319,8 +322,10 @@ export default function HomePage() {
           basePrice = basePrice + (Math.random() - 0.5) * volatility
           initialData.push({ time: now - i * 3, value: Math.round(basePrice * 100) / 100 })
         }
-        areaSeries.setData(initialData as any)
-        seriesRef.current = areaSeries
+        if (areaSeries) {
+          areaSeries.setData(initialData as any)
+          seriesRef.current = areaSeries
+        }
         chartInstance.current = chart
         priceHistoryRef.current = initialData
       } catch (err) { console.error('❌ Chart init error:', err) }
@@ -440,6 +445,7 @@ export default function HomePage() {
   }
 
   const executeTrade = async (prediction: string) => {
+    if (isTrading) return
     setIsTrading(true); setTradeResult(null)
     try {
       const result = Math.random() > 0.5 ? 'WIN' : 'LOSS'
@@ -465,6 +471,7 @@ export default function HomePage() {
         await supabase.from('balances').update({ live_balance: newLive, updated_at: new Date().toISOString() }).eq('user_id', user.id)
       } else {
         const newDemo = demoBalance + delta
+        if (newDemo < 0) { setTradeResult('❌ Insufficient demo balance'); setIsTrading(false); return }
         setDemoBalance(newDemo)
         await supabase.from('balances').update({ demo_balance: newDemo, updated_at: new Date().toISOString() }).eq('user_id', user.id)
       }
@@ -569,18 +576,6 @@ export default function HomePage() {
     'Volatility 10 (1s) Index', 'Volatility 10 Index',
   ]
 
-  let maxDigit = 0;
-  let maxPct = -1;
-  let minDigit = 0;
-  let minPct = 101;
-
-  if (digitTickCount >= 20) {
-    digitPercentages.forEach((pct, digit) => {
-      if (pct > maxPct) { maxPct = pct; maxDigit = digit; }
-      if (pct < minPct) { minPct = pct; minDigit = digit; }
-    });
-  }
-
   // Update phone number function
   const handleUpdatePhone = async () => {
     if (!newPhoneNumber || newPhoneNumber.length < 10) {
@@ -595,7 +590,6 @@ export default function HomePage() {
     if (error) {
       alert(error.message)
     } else {
-      // Update local state to reflect change immediately
       setUser({ ...user, user_metadata: { ...user.user_metadata, phone: newPhoneNumber } })
       setIsPhoneModalOpen(false)
       setNewPhoneNumber('')
@@ -795,8 +789,8 @@ export default function HomePage() {
   const fullName = user?.user_metadata?.full_name || userEmail.split('@')[0].toUpperCase()
   const phoneNumber = user?.user_metadata?.phone || user?.phone || null
   
-  const totalDeposited = liveBalance; // Placeholder
-  const totalWithdrawn = 0; // Placeholder
+  const totalDeposited = liveBalance;
+  const totalWithdrawn = 0;
   const totalTrades = closedPositions.length;
   const totalWins = closedPositions.filter(p => p.result === 'WIN').length;
   const winRate = totalTrades > 0 ? Math.round((totalWins / totalTrades) * 100) : 0;
@@ -809,7 +803,6 @@ export default function HomePage() {
     return (
       <main className={`min-h-screen pb-20 ${isDark ? 'bg-[#0a0613] text-white' : 'bg-gray-50 text-gray-900'}`}>
         
-        {/* TOP BAR */}
         <nav className={`border-b sticky top-0 z-30 ${isDark ? 'border-[#1f1433] bg-[#0d0818]' : 'border-gray-200 bg-white'}`}>
           <div className="px-4 md:px-6 py-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 flex-shrink-0">
@@ -841,7 +834,6 @@ export default function HomePage() {
 
         <div className="px-4 md:px-6 py-6 max-w-2xl mx-auto space-y-4">
           
-          {/* Profile Header Card */}
           <div className={`rounded-3xl border p-6 ${isDark ? 'bg-[#130a21] border-[#2a1b40]' : 'bg-white border-gray-200'}`}>
             <div className="flex items-start gap-4 mb-6">
               <div className="w-16 h-16 rounded-2xl bg-purple-600 flex items-center justify-center text-white font-bold text-2xl shadow-lg shadow-purple-500/30">
@@ -864,7 +856,6 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Account Details */}
           <div className={`rounded-3xl border p-6 ${isDark ? 'bg-[#130a21] border-[#2a1b40]' : 'bg-white border-gray-200'}`}>
             <h3 className={`font-bold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>Account details</h3>
             <div className="space-y-4">
@@ -916,7 +907,6 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Phone Number */}
           <div className={`rounded-3xl border p-6 ${isDark ? 'bg-[#130a21] border-[#2a1b40]' : 'bg-white border-gray-200'}`}>
             <div className="flex justify-between items-center mb-4">
               <h3 className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Phone number</h3>
@@ -954,7 +944,6 @@ export default function HomePage() {
             </button>
           </div>
 
-          {/* Your Trading */}
           <div className={`rounded-3xl border p-6 ${isDark ? 'bg-[#130a21] border-[#2a1b40]' : 'bg-white border-gray-200'}`}>
             <h3 className={`font-bold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>Your trading</h3>
             <div className="grid grid-cols-2 gap-3">
@@ -987,14 +976,12 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Logout Button */}
           <button onClick={handleLogout} className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-bold text-sm transition ${isDark ? 'bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20' : 'bg-red-50 text-red-500 border border-red-100 hover:bg-red-100'}`}>
             <LogOut className="w-4 h-4" /> Log out
           </button>
 
         </div>
 
-        {/* MOBILE BOTTOM NAV */}
         <div className={`fixed bottom-0 left-0 right-0 z-30 border-t md:hidden ${isDark ? 'bg-[#0d0818] border-[#1f1433]' : 'bg-white border-gray-200'}`}>
           <div className="grid grid-cols-5 py-2">
             <button onClick={() => setShowProfile(false)} className={`flex flex-col items-center gap-0.5 py-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
@@ -1020,7 +1007,6 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* CHANGE PHONE MODAL */}
         {isPhoneModalOpen && (
           <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
             <div className={`w-full max-w-sm rounded-2xl border p-6 ${isDark ? 'bg-[#0d0818] border-purple-500/20' : 'bg-white border-gray-200'}`}>
@@ -1058,7 +1044,7 @@ export default function HomePage() {
   }
 
   // ═══════════════════════════════════════════════════════
-  // DASHBOARD (MATCHING SINTREADES SCREENSHOT)
+  // DASHBOARD
   // ═══════════════════════════════════════════════════════
   return (
     <main className="min-h-screen pb-20 md:pb-0 bg-[#f8f9fc] text-gray-900">
@@ -1067,7 +1053,6 @@ export default function HomePage() {
       <nav className="border-b border-gray-200 bg-white sticky top-0 z-30">
         <div className="px-4 md:px-6 py-2 flex items-center justify-between gap-3">
           
-          {/* Left: Logo & Nav Links */}
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2 flex-shrink-0">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center">
@@ -1092,16 +1077,13 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Right: Account, Balance, Withdraw, Avatar */}
           <div className="flex items-center gap-3 flex-shrink-0">
             
-            {/* Live Account Badge */}
             <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs bg-emerald-50 border border-emerald-200">
               <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
               <span className="text-emerald-600 font-medium">LIVE ACCOUNT</span>
             </div>
 
-            {/* Account Dropdown */}
             <div className="relative hidden md:block">
               <button
                 onClick={() => setIsAccountDropdownOpen(!isAccountDropdownOpen)}
@@ -1165,7 +1147,6 @@ export default function HomePage() {
               )}
             </div>
 
-            {/* Withdraw Button */}
             <button
               onClick={() => { setWalletTab('withdraw'); setIsWalletOpen(true) }}
               className="hidden md:flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold bg-purple-600 text-white hover:bg-purple-700 transition"
@@ -1173,7 +1154,6 @@ export default function HomePage() {
               <ArrowUpFromLine className="w-4 h-4" /> Withdraw
             </button>
 
-            {/* Avatar */}
             <button 
               onClick={() => setShowProfile(true)}
               className="w-9 h-9 rounded-full bg-purple-600 flex items-center justify-center text-white font-bold text-sm hover:bg-purple-700 transition"
@@ -1181,7 +1161,6 @@ export default function HomePage() {
               {userInitial}
             </button>
             
-            {/* Theme Toggle */}
             <button
               onClick={() => setTheme(isDark ? 'light' : 'dark')}
               className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition hidden md:flex"
@@ -1189,7 +1168,6 @@ export default function HomePage() {
               {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
 
-            {/* Logout (Mobile) */}
             <button onClick={handleLogout} className="w-9 h-9 rounded-lg flex items-center justify-center bg-gray-100 md:hidden">
               <LogOut className="w-4 h-4 text-gray-500" />
             </button>
@@ -1215,7 +1193,6 @@ export default function HomePage() {
         {/* Center Panel: Chart & Digits */}
         <div className="lg:col-span-7 space-y-4">
           
-          {/* Chart Header */}
           <div className="rounded-2xl border p-4 bg-white border-gray-200">
             <div className="flex items-start justify-between gap-3 mb-2">
               <div className="flex-1 min-w-0">
@@ -1317,7 +1294,7 @@ export default function HomePage() {
             <div className="flex justify-between items-center mb-2">
               <span className="text-xs font-semibold text-gray-600">Stake (USD)</span>
               <div className="flex items-center gap-1 text-xs text-gray-500">
-                <Wallet className="w-3 h-3" /> $0.00
+                <Wallet className="w-3 h-3" /> ${balance.toFixed(2)}
               </div>
             </div>
 
@@ -1346,7 +1323,7 @@ export default function HomePage() {
               ))}
             </div>
 
-            {/* Trade Options */}
+            {/* Manual: Digits */}
             {tradeMode === 'manual' && tradeType === 'digits' && (
               <>
                 <div className="grid grid-cols-3 gap-2 mb-3">
@@ -1355,27 +1332,176 @@ export default function HomePage() {
                   <button onClick={() => setDigitMode('matches-differs')} className={`py-2 rounded-lg text-xs font-semibold border ${digitMode === 'matches-differs' ? 'bg-purple-600 text-white border-purple-600' : 'bg-gray-50 text-gray-600 border-gray-200'}`}>Matches / Differs</button>
                 </div>
 
+                {digitMode === 'over-under' && (
+                  <div className="grid grid-cols-2 gap-2 mt-4">
+                    <button onClick={() => { setDigitSide('OVER'); executeTrade('OVER') }} disabled={isTrading}
+                      className="py-3 rounded-2xl text-emerald-700 bg-emerald-200 font-bold active:scale-[0.98] transition disabled:opacity-50">
+                      <div className="flex justify-between items-center px-3 mb-1">
+                        <span className="text-sm font-extrabold">OVER {selectedDigit}</span>
+                        <span className="text-[10px] bg-white/40 px-1 rounded">+{overPercent}%</span>
+                      </div>
+                      <div className="text-[10px] text-left px-3 opacity-80">Payout ${(stake * overMultiplier).toFixed(2)}</div>
+                    </button>
+                    <button onClick={() => { setDigitSide('UNDER'); executeTrade('UNDER') }} disabled={isTrading}
+                      className="py-3 rounded-2xl text-red-700 bg-red-200 font-bold active:scale-[0.98] transition disabled:opacity-50">
+                      <div className="flex justify-between items-center px-3 mb-1">
+                        <span className="text-sm font-extrabold">UNDER {selectedDigit}</span>
+                        <span className="text-[10px] bg-white/40 px-1 rounded">+{underPercent}%</span>
+                      </div>
+                      <div className="text-[10px] text-left px-3 opacity-80">Payout ${(stake * underMultiplier).toFixed(2)}</div>
+                    </button>
+                  </div>
+                )}
+
                 {digitMode === 'even-odd' && (
                   <div className="grid grid-cols-2 gap-2 mt-4">
                     <button onClick={() => { setDigitSide('EVEN'); executeTrade('EVEN') }} disabled={isTrading}
-                      className="py-3 rounded-2xl text-emerald-700 bg-emerald-200 font-bold active:scale-[0.98] transition disabled:opacity-50 relative overflow-hidden">
-                      <div className="flex justify-between items-center px-3 mb-1 relative z-10">
+                      className="py-3 rounded-2xl text-emerald-700 bg-emerald-200 font-bold active:scale-[0.98] transition disabled:opacity-50">
+                      <div className="flex justify-between items-center px-3 mb-1">
                         <span className="text-sm font-extrabold">EVEN</span>
                         <span className="text-[10px] bg-white/40 px-1 rounded">+90%</span>
                       </div>
-                      <div className="text-[10px] text-left px-3 opacity-80 relative z-10">Payout $19.00</div>
+                      <div className="text-[10px] text-left px-3 opacity-80">Payout ${(stake * 1.9).toFixed(2)}</div>
                     </button>
                     <button onClick={() => { setDigitSide('ODD'); executeTrade('ODD') }} disabled={isTrading}
-                      className="py-3 rounded-2xl text-red-700 bg-red-200 font-bold active:scale-[0.98] transition disabled:opacity-50 relative overflow-hidden">
-                      <div className="flex justify-between items-center px-3 mb-1 relative z-10">
+                      className="py-3 rounded-2xl text-red-700 bg-red-200 font-bold active:scale-[0.98] transition disabled:opacity-50">
+                      <div className="flex justify-between items-center px-3 mb-1">
                         <span className="text-sm font-extrabold">ODD</span>
                         <span className="text-[10px] bg-white/40 px-1 rounded">+90%</span>
                       </div>
-                      <div className="text-[10px] text-left px-3 opacity-80 relative z-10">Payout $19.00</div>
+                      <div className="text-[10px] text-left px-3 opacity-80">Payout ${(stake * 1.9).toFixed(2)}</div>
+                    </button>
+                  </div>
+                )}
+
+                {digitMode === 'matches-differs' && (
+                  <div className="grid grid-cols-2 gap-2 mt-4">
+                    <button onClick={() => { setDigitSide('MATCHES'); executeTrade('MATCHES') }} disabled={isTrading}
+                      className="py-3 rounded-2xl text-emerald-700 bg-emerald-200 font-bold active:scale-[0.98] transition disabled:opacity-50">
+                      <div className="flex justify-between items-center px-3 mb-1">
+                        <span className="text-sm font-extrabold">MATCHES {selectedDigit}</span>
+                        <span className="text-[10px] bg-white/40 px-1 rounded">+800%</span>
+                      </div>
+                      <div className="text-[10px] text-left px-3 opacity-80">Payout ${(stake * 9).toFixed(2)}</div>
+                    </button>
+                    <button onClick={() => { setDigitSide('DIFFERS'); executeTrade('DIFFERS') }} disabled={isTrading}
+                      className="py-3 rounded-2xl text-red-700 bg-red-200 font-bold active:scale-[0.98] transition disabled:opacity-50">
+                      <div className="flex justify-between items-center px-3 mb-1">
+                        <span className="text-sm font-extrabold">DIFFERS {selectedDigit}</span>
+                        <span className="text-[10px] bg-white/40 px-1 rounded">+9%</span>
+                      </div>
+                      <div className="text-[10px] text-left px-3 opacity-80">Payout ${(stake * 1.09).toFixed(2)}</div>
                     </button>
                   </div>
                 )}
               </>
+            )}
+
+            {/* Manual: Rise/Fall */}
+            {tradeMode === 'manual' && tradeType === 'rise-fall' && (
+              <div className="grid grid-cols-2 gap-2 mt-4">
+                <button onClick={() => executeTrade('UP')} disabled={isTrading}
+                  className="py-4 rounded-2xl text-emerald-700 bg-emerald-200 font-bold active:scale-[0.98] transition disabled:opacity-50">
+                  <div className="flex justify-between items-center px-3 mb-1">
+                    <span className="text-base font-extrabold">RISE ▲</span>
+                    <span className="text-[10px] bg-white/40 px-1 rounded">+100%</span>
+                  </div>
+                  <div className="text-[10px] text-left px-3 opacity-80">Payout ${(stake * 2).toFixed(2)}</div>
+                </button>
+                <button onClick={() => executeTrade('DOWN')} disabled={isTrading}
+                  className="py-4 rounded-2xl text-red-700 bg-red-200 font-bold active:scale-[0.98] transition disabled:opacity-50">
+                  <div className="flex justify-between items-center px-3 mb-1">
+                    <span className="text-base font-extrabold">FALL ▼</span>
+                    <span className="text-[10px] bg-white/40 px-1 rounded">+100%</span>
+                  </div>
+                  <div className="text-[10px] text-left px-3 opacity-80">Payout ${(stake * 2).toFixed(2)}</div>
+                </button>
+              </div>
+            )}
+
+            {/* Manual: Multipliers */}
+            {tradeMode === 'manual' && tradeType === 'multipliers' && (
+              <div className="mt-4 space-y-3">
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-xs font-semibold text-gray-600">Multiplier</span>
+                    <span className="text-xs font-bold text-purple-600">{multiplier}×</span>
+                  </div>
+                  <div className="grid grid-cols-5 gap-1">
+                    {[100, 200, 500, 1000, 2000].map((m) => (
+                      <button key={m} onClick={() => setMultiplier(m)}
+                        className={`py-2 rounded-lg text-[11px] font-semibold transition ${multiplier === m ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                        {m}×
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={() => executeTrade('UP')} disabled={isTrading}
+                    className="py-3 rounded-2xl text-emerald-700 bg-emerald-200 font-bold active:scale-[0.98] transition disabled:opacity-50">
+                    <div className="text-sm font-extrabold">RISE ▲</div>
+                    <div className="text-[10px] opacity-80">{multiplier}× exposure</div>
+                  </button>
+                  <button onClick={() => executeTrade('DOWN')} disabled={isTrading}
+                    className="py-3 rounded-2xl text-red-700 bg-red-200 font-bold active:scale-[0.98] transition disabled:opacity-50">
+                    <div className="text-sm font-extrabold">FALL ▼</div>
+                    <div className="text-[10px] opacity-80">{multiplier}× exposure</div>
+                  </button>
+                </div>
+                <div className="text-[10px] text-gray-400 text-center">Max loss is capped at your stake.</div>
+              </div>
+            )}
+
+            {/* Auto: Bot Controls */}
+            {tradeMode === 'auto' && (
+              <div className="mt-2 space-y-3">
+                <div>
+                  <label className="text-[11px] font-semibold text-gray-600 block mb-1.5">Bot direction</label>
+                  <div className="grid grid-cols-4 gap-1">
+                    {['RISE', 'FALL', 'EVEN', 'ODD'].map((b) => (
+                      <button key={b} onClick={() => setBotTrade(b)}
+                        className={`py-2 rounded-lg text-[11px] font-semibold transition ${botTrade === b ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                        {b}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] font-semibold text-gray-500 block mb-1">Martingale ×</label>
+                    <input type="number" min={1} step={0.1} value={martingale} onChange={(e) => setMartingale(Number(e.target.value))}
+                      className="w-full rounded-lg px-3 py-2 text-sm bg-gray-50 border border-gray-200 text-gray-900 outline-none focus:border-purple-500" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-gray-500 block mb-1">Max runs</label>
+                    <input type="number" min={1} value={maxRuns} onChange={(e) => setMaxRuns(Number(e.target.value))}
+                      className="w-full rounded-lg px-3 py-2 text-sm bg-gray-50 border border-gray-200 text-gray-900 outline-none focus:border-purple-500" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-gray-500 block mb-1">Target profit $</label>
+                    <input type="number" min={0} value={targetProfit} onChange={(e) => setTargetProfit(Number(e.target.value))}
+                      className="w-full rounded-lg px-3 py-2 text-sm bg-gray-50 border border-gray-200 text-gray-900 outline-none focus:border-purple-500" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-gray-500 block mb-1">Stop loss $</label>
+                    <input type="number" min={0} value={stopLoss} onChange={(e) => setStopLoss(Number(e.target.value))}
+                      className="w-full rounded-lg px-3 py-2 text-sm bg-gray-50 border border-gray-200 text-gray-900 outline-none focus:border-purple-500" />
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setIsBotRunning(!isBotRunning)}
+                  className={`w-full py-3 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2 ${isBotRunning ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-emerald-500 text-white hover:bg-emerald-600'}`}
+                >
+                  {isBotRunning ? <><Square className="w-4 h-4" /> Stop Bot</> : <><Play className="w-4 h-4" /> Start Bot</>}
+                </button>
+                {isBotRunning && (
+                  <div className="text-center text-[10px] text-emerald-600 font-medium animate-pulse">
+                    ● Bot is running on {selectedMarket}
+                  </div>
+                )}
+              </div>
             )}
 
             {balance < stake && (
@@ -1393,7 +1519,9 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* WALLET MODAL */}
+      {/* ═══════════════════════════════════════════
+          WALLET MODAL
+      ═══════════════════════════════════════════ */}
       {isWalletOpen && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
           <div className={`w-full max-w-md rounded-2xl border bg-white border-gray-200 max-h-[90vh] overflow-y-auto`}>
@@ -1422,10 +1550,13 @@ export default function HomePage() {
                   <ArrowUpFromLine className="w-4 h-4" /> Withdraw
                 </button>
               </div>
+
               <div className="flex gap-2 mb-4">
                 <button onClick={() => { setPaymentMethod('mpesa'); setWalletMessage(null) }} className={`flex-1 py-3 rounded-lg text-sm font-semibold transition ${paymentMethod === 'mpesa' ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-600'}`}>📱 M-Pesa</button>
                 <button onClick={() => { setPaymentMethod('crypto'); setWalletMessage(null) }} className={`flex-1 py-3 rounded-lg text-sm font-semibold transition ${paymentMethod === 'crypto' ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-600'}`}>₿ Crypto</button>
               </div>
+
+              {/* DEPOSIT */}
               {walletTab === 'deposit' && (
                 <>
                   <div className="mb-4">
@@ -1439,6 +1570,7 @@ export default function HomePage() {
                       ))}
                     </div>
                   </div>
+
                   {paymentMethod === 'mpesa' && (
                     <div className="mb-4">
                       <label className="text-xs block mb-2 font-semibold text-gray-600">M-Pesa Phone Number</label>
@@ -1446,13 +1578,79 @@ export default function HomePage() {
                         className="w-full rounded-lg px-4 py-3 outline-none border text-sm bg-gray-50 text-gray-900 border-gray-200 focus:border-purple-500" />
                     </div>
                   )}
+
+                  {paymentMethod === 'crypto' && (
+                    <div className="mb-4 space-y-3">
+                      <div>
+                        <label className="text-xs block mb-2 font-semibold text-gray-600">Coin</label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {['USDT', 'BTC', 'ETH'].map((c) => (
+                            <button key={c} onClick={() => { setCryptoCoin(c); setCryptoTxHash('') }}
+                              className={`py-2 rounded-lg text-xs font-semibold ${cryptoCoin === c ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-700'}`}>{c}</button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs block mb-1 font-semibold text-gray-600">Send to ({CRYPTO_NETWORKS[cryptoCoin]})</label>
+                        <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                          <code className="text-[11px] flex-1 break-all text-gray-700">{CRYPTO_ADDRESSES[cryptoCoin]}</code>
+                          <button onClick={() => copyToClipboard(CRYPTO_ADDRESSES[cryptoCoin])} className="text-gray-400 hover:text-gray-600 flex-shrink-0">
+                            {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs block mb-2 font-semibold text-gray-600">Transaction hash</label>
+                        <input value={cryptoTxHash} onChange={(e) => setCryptoTxHash(e.target.value)} placeholder="Paste TX hash after sending"
+                          className="w-full rounded-lg px-4 py-3 outline-none border text-sm bg-gray-50 text-gray-900 border-gray-200 focus:border-orange-500" />
+                      </div>
+                    </div>
+                  )}
+
                   {walletMessage && (
                     <div className={`mb-4 p-3 rounded-lg text-sm ${walletMessage.includes('✅') ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-red-50 text-red-500 border border-red-200'}`}>{walletMessage}</div>
                   )}
-                  <button onClick={handleMpesaDeposit}
-                    disabled={isProcessing || !depositAmount}
+
+                  <button
+                    onClick={paymentMethod === 'mpesa' ? handleMpesaDeposit : handleCryptoDeposit}
+                    disabled={isProcessing || !depositAmount || (paymentMethod === 'crypto' && !cryptoTxHash)}
                     className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-xl font-bold text-sm">
-                    {isProcessing ? 'Processing...' : `Pay $${depositAmount || '0'} with M-Pesa`}
+                    {isProcessing ? 'Processing...' : paymentMethod === 'mpesa' ? `Pay $${depositAmount || '0'} with M-Pesa` : `Submit ${cryptoCoin} deposit`}
+                  </button>
+                </>
+              )}
+
+              {/* WITHDRAW */}
+              {walletTab === 'withdraw' && (
+                <>
+                  <div className="mb-4">
+                    <label className="text-xs block mb-2 font-semibold text-gray-600">Amount (USD)</label>
+                    <input type="number" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} placeholder="0.00" min={1}
+                      className="w-full rounded-lg px-4 py-3 outline-none border text-sm font-medium bg-gray-50 text-gray-900 border-gray-200 focus:border-purple-500" />
+                    <div className="text-[10px] text-gray-400 mt-1">Available: ${liveBalance.toFixed(2)}</div>
+                  </div>
+
+                  {paymentMethod === 'mpesa' ? (
+                    <div className="mb-4">
+                      <label className="text-xs block mb-2 font-semibold text-gray-600">M-Pesa Phone Number</label>
+                      <input type="tel" value={withdrawPhone} onChange={(e) => setWithdrawPhone(e.target.value)} placeholder="0712 345 678"
+                        className="w-full rounded-lg px-4 py-3 outline-none border text-sm bg-gray-50 text-gray-900 border-gray-200 focus:border-purple-500" />
+                    </div>
+                  ) : (
+                    <div className="mb-4">
+                      <label className="text-xs block mb-2 font-semibold text-gray-600">Crypto address</label>
+                      <input value={withdrawAddress} onChange={(e) => setWithdrawAddress(e.target.value)} placeholder="Paste your wallet address"
+                        className="w-full rounded-lg px-4 py-3 outline-none border text-sm bg-gray-50 text-gray-900 border-gray-200 focus:border-orange-500" />
+                    </div>
+                  )}
+
+                  {walletMessage && (
+                    <div className={`mb-4 p-3 rounded-lg text-sm ${walletMessage.includes('✅') ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-red-50 text-red-500 border border-red-200'}`}>{walletMessage}</div>
+                  )}
+
+                  <button onClick={handleWithdraw} disabled={isProcessing || !withdrawAmount}
+                    className="w-full py-3.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-xl font-bold text-sm">
+                    {isProcessing ? 'Processing...' : `Withdraw $${withdrawAmount || '0'}`}
                   </button>
                 </>
               )}
@@ -1461,7 +1659,9 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* AI SCANNER */}
+      {/* ═══════════════════════════════════════════
+          AI SCANNER MODAL
+      ═══════════════════════════════════════════ */}
       {tradeMode === 'ai' && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
           <div className="w-full max-w-md rounded-2xl border bg-white border-gray-200">
@@ -1481,10 +1681,49 @@ export default function HomePage() {
                   <div className="mb-4 p-5 rounded-2xl bg-purple-50 border border-purple-100 text-center">
                     <div className="w-14 h-14 mx-auto rounded-full bg-purple-500/20 flex items-center justify-center mb-3 animate-pulse"><Sparkles className="w-6 h-6 text-purple-600" /></div>
                     <div className="text-gray-900 font-bold">Deep scanning</div>
+                    <div className="text-xs text-gray-500 mt-1">Analyzing volatility & digit patterns…</div>
                   </div>
                   <div className="mb-4">
                     <div className="flex justify-between items-center mb-2"><span className="text-xs text-gray-500">Analyzing...</span><span className="text-xs font-medium text-gray-600">{aiScanProgress}/10</span></div>
                     <div className="h-1.5 rounded-full overflow-hidden bg-gray-100"><div className="h-full bg-purple-500 transition-all" style={{ width: `${(aiScanProgress / 10) * 100}%` }} /></div>
+                  </div>
+                  <div className="grid grid-cols-5 gap-1 mb-2">
+                    {aiMarkets.map((m) => (
+                      <div key={m} className={`py-1 rounded text-[9px] font-semibold text-center ${aiScannedMarkets.includes(m) ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-400'}`}>{m}</div>
+                    ))}
+                  </div>
+                </>
+              ) : aiScannedMarkets.length === aiMarkets.length ? (
+                <>
+                  <div className="mb-4 p-4 rounded-2xl bg-emerald-50 border border-emerald-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-[10px] font-bold tracking-wider text-emerald-600">BEST ENTRY FOUND</span>
+                    </div>
+                    <div className="flex items-baseline justify-between">
+                      <div>
+                        <div className="text-lg font-extrabold text-gray-900">{aiBestMarket}</div>
+                        <div className="text-xs text-gray-500">Prediction: <span className="font-bold text-emerald-600">{aiPrediction}</span></div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-[10px] text-gray-500">Confidence</div>
+                        <div className="text-lg font-bold text-emerald-600">92%</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mb-4">
+                    <label className="text-xs block mb-2 font-semibold text-gray-600">Bot trade type</label>
+                    <select value={aiTradeType} onChange={(e) => setAiTradeType(e.target.value)}
+                      className="w-full rounded-lg px-3 py-2.5 outline-none border text-sm bg-gray-50 text-gray-900 border-gray-200 focus:border-purple-500">
+                      <option>Even / Odd</option>
+                      <option>Over / Under</option>
+                      <option>Match / Differ</option>
+                    </select>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button onClick={runDeepScan} className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold text-sm">Re-scan</button>
+                    <button onClick={() => { loadScannerBot(); setTradeMode('manual') }} className="flex-1 py-3 bg-purple-600 text-white rounded-xl font-bold text-sm">Load Bot →</button>
                   </div>
                 </>
               ) : (
