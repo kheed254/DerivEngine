@@ -90,8 +90,8 @@ export default function ProfilePage() {
       
       {/* Background Gradient & Chart SVG */}
       <div className="absolute inset-0 pointer-events-none -z-10 overflow-hidden">
-        <div className="absolute top-0 right-0 w-[80%] h-[80%] rounded-full blur-[120px] opacity-30 bg-purple-300/40" />
-        <svg className="absolute bottom-0 w-full h-[50vh] opacity-20" viewBox="0 0 100 40" preserveAspectRatio="none">
+        <div className="absolute top-0 right-0 w-[80%] h-[80%] rounded-full blur-[120px] opacity-40 bg-purple-300/40" />
+        <svg className="absolute bottom-0 w-full h-[50vh] opacity-30" viewBox="0 0 100 40" preserveAspectRatio="none">
            <path d="M0,40 L0,30 L10,32 L20,22 L35,28 L50,18 L65,25 L80,15 L100,20 L100,40 Z" fill="url(#grad-profile)" />
            <defs>
              <linearGradient id="grad-profile" x1="0" x2="0" y1="0" y2="1">
@@ -105,7 +105,7 @@ export default function ProfilePage() {
 
       {/* ── TOP BAR ───────────────────────────── */}
       <nav className="border-b sticky top-0 z-30 backdrop-blur-md border-gray-200 bg-white/80">
-        <div className="px-4 md:px-6 py-2 flex items-center justify-between gap-3 max-w-5xl mx-auto w-full">
+        <div className="px-4 md:px-6 py-2 flex items-center justify-between gap-3 max-w-6xl mx-auto w-full">
           
           <div className="flex items-center gap-6">
             <Link href="/" className="flex items-center gap-2 flex-shrink-0">
@@ -188,7 +188,7 @@ export default function ProfilePage() {
               <ArrowDownToLine className="w-4 h-4" /> Deposit
             </button>
 
-            <Link href="/profile" className="w-9 h-9 rounded-full bg-purple-600 flex items-center justify-center text-white font-bold text-sm hover:bg-purple-700 transition ring-2 ring-purple-300">
+            <Link href="/profile" className="w-9 h-9 rounded-full bg-purple-600 flex items-center justify-center text-white font-bold text-sm hover:bg-purple-700 transition ring-2 ring-purple-300 ring-offset-1">
               {userInitial}
             </Link>
             
@@ -204,10 +204,10 @@ export default function ProfilePage() {
       </nav>
 
       {/* ── MAIN CONTENT ───────────────────────────── */}
-      <div className="flex-1 px-4 md:px-6 py-6 max-w-3xl mx-auto w-full space-y-4 relative z-10">
+      <div className="flex-1 px-4 md:px-6 py-6 max-w-5xl mx-auto w-full space-y-4 relative z-10">
         
         {/* Profile Header Card */}
-        <div className="rounded-3xl border p-6 bg-white border-gray-100 shadow-xl shadow-gray-200/50">
+        <div className="rounded-3xl border p-6 bg-white/60 backdrop-blur-xl border-white/40 shadow-xl shadow-gray-200/50">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-4">
               <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center text-white font-bold text-2xl shadow-lg shadow-purple-500/30">
@@ -217,7 +217,7 @@ export default function ProfilePage() {
                 <h2 className="text-xl font-bold truncate text-gray-900 uppercase">{fullName}</h2>
                 <p className="text-sm truncate text-gray-500">{userEmail}</p>
                 <div className="flex items-center gap-2 mt-2">
-                  <span className="text-[11px] font-bold text-gray-400 bg-gray-50 px-2 py-0.5 rounded border border-gray-200">{accountNumber}</span>
+                  <span className="text-[11px] font-bold text-gray-600 bg-white px-2 py-0.5 rounded border border-gray-200">{accountNumber}</span>
                   <button onClick={() => copyToClipboard(accountNumber)} className="text-gray-400 hover:text-gray-600">
                     {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
                   </button>
@@ -232,11 +232,11 @@ export default function ProfilePage() {
         </div>
 
         {/* Account Details */}
-        <div className="rounded-3xl border p-6 bg-white border-gray-100 shadow-xl shadow-gray-200/50">
+        <div className="rounded-3xl border p-6 bg-white/70 backdrop-blur-xl border-white/40 shadow-xl shadow-gray-200/50">
           <h3 className="font-bold mb-4 text-gray-900">Account details</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="flex items-center gap-4 bg-gray-50 border border-gray-100 rounded-xl p-3">
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-white border border-gray-200">
+            <div className="flex items-center gap-4 bg-white/60 border border-white/60 rounded-xl p-3 shadow-sm">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-white border border-gray-200 shadow-sm">
                 <Mail className="w-4 h-4 text-gray-400" />
               </div>
               <div className="min-w-0">
@@ -245,8 +245,8 @@ export default function ProfilePage() {
               </div>
             </div>
             
-            <div className="flex items-center gap-4 bg-gray-50 border border-gray-100 rounded-xl p-3">
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-white border border-gray-200">
+            <div className="flex items-center gap-4 bg-white/60 border border-white/60 rounded-xl p-3 shadow-sm">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-white border border-gray-200 shadow-sm">
                 <Globe className="w-4 h-4 text-gray-400" />
               </div>
               <div>
@@ -255,8 +255,8 @@ export default function ProfilePage() {
               </div>
             </div>
             
-            <div className="flex items-center gap-4 bg-gray-50 border border-gray-100 rounded-xl p-3">
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-white border border-gray-200">
+            <div className="flex items-center gap-4 bg-white/60 border border-white/60 rounded-xl p-3 shadow-sm">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-white border border-gray-200 shadow-sm">
                 <Hash className="w-4 h-4 text-gray-400" />
               </div>
               <div>
@@ -265,8 +265,8 @@ export default function ProfilePage() {
               </div>
             </div>
             
-            <div className="flex items-center gap-4 bg-gray-50 border border-gray-100 rounded-xl p-3">
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-white border border-gray-200">
+            <div className="flex items-center gap-4 bg-white/60 border border-white/60 rounded-xl p-3 shadow-sm">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-white border border-gray-200 shadow-sm">
                 <Calendar className="w-4 h-4 text-gray-400" />
               </div>
               <div>
@@ -275,8 +275,8 @@ export default function ProfilePage() {
               </div>
             </div>
             
-            <div className="flex items-center gap-4 bg-gray-50 border border-gray-100 rounded-xl p-3 sm:col-span-2 sm:w-1/2 sm:pr-2">
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-white border border-gray-200">
+            <div className="flex items-center gap-4 bg-white/60 border border-white/60 rounded-xl p-3 shadow-sm sm:col-span-2 sm:w-1/2 sm:pr-2">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-white border border-gray-200 shadow-sm">
                 <TrendingUp className="w-4 h-4 text-gray-400" />
               </div>
               <div>
@@ -288,7 +288,7 @@ export default function ProfilePage() {
         </div>
 
         {/* Phone Number */}
-        <div className="rounded-3xl border p-6 bg-white border-gray-100 shadow-xl shadow-gray-200/50">
+        <div className="rounded-3xl border p-6 bg-white/70 backdrop-blur-xl border-white/40 shadow-xl shadow-gray-200/50">
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-bold text-gray-900">Phone number</h3>
             {phoneNumber && (
@@ -299,7 +299,7 @@ export default function ProfilePage() {
           </div>
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-purple-50 text-purple-600">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-purple-50 text-purple-600 shadow-sm">
                 <Phone className="w-5 h-5" />
               </div>
               <div>
@@ -314,7 +314,7 @@ export default function ProfilePage() {
                 setNewPhoneNumber(phoneNumber || '');
                 setIsPhoneModalOpen(true);
               }}
-              className="px-4 py-2 rounded-lg text-xs font-semibold border border-gray-200 hover:bg-gray-50 transition text-gray-700 whitespace-nowrap"
+              className="px-4 py-2 rounded-lg text-xs font-semibold border border-gray-200 bg-white hover:bg-gray-50 transition text-gray-700 whitespace-nowrap shadow-sm"
             >
               Change number
             </button>
@@ -322,30 +322,30 @@ export default function ProfilePage() {
         </div>
 
         {/* Your Trading */}
-        <div className="rounded-3xl border p-6 bg-white border-gray-100 shadow-xl shadow-gray-200/50">
+        <div className="rounded-3xl border p-6 bg-white/70 backdrop-blur-xl border-white/40 shadow-xl shadow-gray-200/50">
           <h3 className="font-bold mb-4 text-gray-900">Your trading</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            <div className="p-4 rounded-xl border bg-gray-50 border-gray-100">
+            <div className="p-4 rounded-xl border bg-white/60 border-white/60 shadow-sm">
               <div className="text-[10px] text-gray-500 font-bold tracking-wider mb-1">DEPOSITED</div>
               <div className="text-xl font-bold text-gray-900">${liveBalance.toFixed(2)}</div>
             </div>
-            <div className="p-4 rounded-xl border bg-gray-50 border-gray-100">
+            <div className="p-4 rounded-xl border bg-white/60 border-white/60 shadow-sm">
               <div className="text-[10px] text-gray-500 font-bold tracking-wider mb-1">WITHDRAWN</div>
               <div className="text-xl font-bold text-yellow-500">$0.00</div>
             </div>
-            <div className="p-4 rounded-xl border bg-gray-50 border-gray-100">
+            <div className="p-4 rounded-xl border bg-white/60 border-white/60 shadow-sm">
               <div className="text-[10px] text-gray-500 font-bold tracking-wider mb-1">TRADES</div>
               <div className="text-xl font-bold text-gray-900">0</div>
             </div>
-            <div className="p-4 rounded-xl border bg-gray-50 border-gray-100">
+            <div className="p-4 rounded-xl border bg-white/60 border-white/60 shadow-sm">
               <div className="text-[10px] text-gray-500 font-bold tracking-wider mb-1">WIN RATE</div>
               <div className="text-xl font-bold text-purple-600">0%</div>
             </div>
-            <div className="p-4 rounded-xl border bg-gray-50 border-gray-100">
+            <div className="p-4 rounded-xl border bg-white/60 border-white/60 shadow-sm">
               <div className="text-[10px] text-gray-500 font-bold tracking-wider mb-1">WINS</div>
               <div className="text-xl font-bold text-emerald-500">0</div>
             </div>
-            <div className="p-4 rounded-xl border bg-gray-50 border-gray-100">
+            <div className="p-4 rounded-xl border bg-white/60 border-white/60 shadow-sm">
               <div className="text-[10px] text-gray-500 font-bold tracking-wider mb-1">NET P&L</div>
               <div className="text-xl font-bold text-emerald-500">$0.00</div>
             </div>
@@ -353,7 +353,7 @@ export default function ProfilePage() {
         </div>
 
         {/* Logout Button */}
-        <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-bold text-sm transition bg-red-50 text-red-500 border border-red-100 hover:bg-red-100">
+        <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-bold text-sm transition bg-red-50/80 backdrop-blur-md text-red-500 border border-red-100 hover:bg-red-100">
           <LogOut className="w-4 h-4" /> Log out
         </button>
 
