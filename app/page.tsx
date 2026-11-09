@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { DerivClient } from '@/lib/derivClient'
-import { ChevronDown, LogOut, Clock, Zap, Play, X, Search, Sparkles, Copy, Check, Wallet, ArrowDownToLine, ArrowUpFromLine, TrendingUp, History, Gift, BarChart3, ShieldCheck, ArrowRight, Bell, Sun, Moon, Mail, Globe, Hash, Calendar, Phone } from 'lucide-react'
+import { ChevronDown, LogOut, Clock, Zap, Play, X, Search, Sparkles, Copy, Check, Wallet, ArrowDownToLine, ArrowUpFromLine, TrendingUp, History, Gift, BarChart3, ShieldCheck, ArrowRight, Bell, Sun, Moon, Mail, Globe, Hash, Calendar, Phone, AlertCircle } from 'lucide-react'
 
 export default function HomePage() {
   const [price, setPrice] = useState(730.69)
@@ -793,6 +793,7 @@ export default function HomePage() {
   const memberSince = user?.created_at ? new Date(user.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'October 2026'
   const userEmail = user?.email || 'user@example.com'
   const fullName = user?.user_metadata?.full_name || userEmail.split('@')[0].toUpperCase()
+  const phoneNumber = user?.user_metadata?.phone || user?.phone || null
   
   const totalDeposited = liveBalance; // Placeholder
   const totalWithdrawn = 0; // Placeholder
@@ -919,24 +920,33 @@ export default function HomePage() {
           <div className={`rounded-3xl border p-6 ${isDark ? 'bg-[#130a21] border-[#2a1b40]' : 'bg-white border-gray-200'}`}>
             <div className="flex justify-between items-center mb-4">
               <h3 className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Phone number</h3>
-              <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                <ShieldCheck className="w-3 h-3" /> Verified
-              </div>
+              
+              {/* DYNAMIC BADGE */}
+              {phoneNumber ? (
+                <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                  <ShieldCheck className="w-3 h-3" /> Verified
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-500/10 text-red-500 border border-red-500/20">
+                  <AlertCircle className="w-3 h-3" /> Missing
+                </div>
+              )}
             </div>
+            
             <div className="flex items-start gap-4 mb-4">
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? 'bg-[#1f1433]' : 'bg-gray-100'}`}>
                 <Phone className="w-4 h-4 text-purple-500" />
               </div>
               <div>
                 <div className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                  {user?.user_metadata?.phone || user?.phone || 'Not set'}
+                  {phoneNumber || 'Not set'}
                 </div>
                 <div className="text-xs text-gray-500 mt-1">Used to authorize your M-Pesa deposits & withdrawals.</div>
               </div>
             </div>
             <button 
               onClick={() => {
-                setNewPhoneNumber(user?.user_metadata?.phone || '');
+                setNewPhoneNumber(phoneNumber || '');
                 setIsPhoneModalOpen(true);
               }}
               className={`px-4 py-2 rounded-lg text-sm font-semibold border transition ${isDark ? 'border-[#2a1b40] hover:bg-white/5' : 'border-gray-200 hover:bg-gray-50'}`}
