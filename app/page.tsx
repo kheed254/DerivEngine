@@ -18,10 +18,8 @@ export default function HomePage() {
   const [liveBalance, setLiveBalance] = useState(0)
   const [balancePulse, setBalancePulse] = useState(false)
   const [isLiveMode, setIsLiveMode] = useState(true)
-  const [displayCurrency, setDisplayCurrency] = useState<'USD' | 'KES'>('USD')
   const [isAccountDropdownOpen, setIsAccountDropdownOpen] = useState(false)
   const [stake, setStake] = useState(10)
-  const [duration, setDuration] = useState(60)
   const [multiplier, setMultiplier] = useState(100)
   const [selectedMarket, setSelectedMarket] = useState('Volatility 100 (1s) Index')
   const [isTrading, setIsTrading] = useState(false)
@@ -253,7 +251,6 @@ export default function HomePage() {
     }
   }, [showDashboard, selectedMarket])
 
-  // Record digit whenever price changes (moved out of setPrice updater)
   useEffect(() => {
     const d = Math.floor(price * 100) % 10
     setLastDigit(d)
@@ -456,6 +453,7 @@ export default function HomePage() {
       else if (prediction === 'DIFFERS') payoutRate = 1.09
       else if (prediction === 'EVEN' || prediction === 'ODD') payoutRate = 1.9
       else if (prediction === 'UP' || prediction === 'DOWN') payoutRate = 2.0
+      
       const payout = result === 'WIN' ? stake * payoutRate : 0
       const contract = {
         id: Math.random().toString(36).substring(2, 10),
@@ -464,34 +462,50 @@ export default function HomePage() {
         time: new Date().toLocaleTimeString(),
       }
       const delta = result === 'WIN' ? payout : -stake
+      
+      let newBalance = 0;
+      
       if (isLiveMode) {
-        const newLive = liveBalance + delta
-        if (newLive < 0) { setTradeResult('❌ Insufficient live balance'); setIsTrading(false); return }
-        setLiveBalance(newLive)
-        await supabase.from('balances').update({ live_balance: newLive, updated_at: new Date().toISOString() }).eq('user_id', user.id)
+        newBalance = liveBalance + delta
+        if (newBalance < 0) { setTradeResult('❌ Insufficient live balance'); setIsTrading(false); return }
+        setLiveBalance(newBalance)
+        const { error } = await supabase.from('balances').update({ live_balance: newBalance, updated_at: new Date().toISOString() }).eq('user_id', user.id)
+        if (error) console.error("Balance update error:", error)
       } else {
-        const newDemo = demoBalance + delta
-        if (newDemo < 0) { setTradeResult('❌ Insufficient demo balance'); setIsTrading(false); return }
-        setDemoBalance(newDemo)
-        await supabase.from('balances').update({ demo_balance: newDemo, updated_at: new Date().toISOString() }).eq('user_id', user.id)
+        newBalance = demoBalance + delta
+        if (newBalance < 0) { setTradeResult('❌ Insufficient demo balance'); setIsTrading(false); return }
+        setDemoBalance(newBalance)
+        const { error } = await supabase.from('balances').update({ demo_balance: newBalance, updated_at: new Date().toISOString() }).eq('user_id', user.id)
+        if (error) console.error("Balance update error:", error)
       }
+
       if (result === 'WIN') setTradeResult(`🎉 You won! +$${payout.toFixed(2)}`)
       else setTradeResult(`😢 You lost. -$${stake.toFixed(2)}`)
+      
       setBalancePulse(true); setTimeout(() => setBalancePulse(false), 800)
       setOpenPositions((prev) => [contract, ...prev])
+      
       try {
-        await supabase.from('trades').insert({
+        const { error: tradeError } = await supabase.from('trades').insert({
           user_id: user.id, market: selectedMarket, trade_type: tradeType,
           prediction, stake, entry_price: price, result,
           payout: result === 'WIN' ? payout : -stake,
         })
-      } catch (err) {}
+        if (tradeError) console.error("Trade history save error:", tradeError)
+      } catch (err) {
+        console.error("Trade history crash:", err)
+      }
+
       setTimeout(() => {
         setOpenPositions((prev) => prev.filter((c) => c.id !== contract.id))
         setClosedPositions((prev) => [contract, ...prev])
       }, 5000)
+      
       setIsTrading(false)
-    } catch (error: any) { setTradeResult(`❌ Error: ${error.message}`); setIsTrading(false) }
+    } catch (error: any) { 
+      setTradeResult(`❌ Error: ${error.message}`); 
+      setIsTrading(false) 
+    }
   }
 
   useEffect(() => {
@@ -531,7 +545,6 @@ export default function HomePage() {
     if (user?.id) await supabase.from('balances').update({ demo_balance: 10000 }).eq('user_id', user.id)
     setTradeResult('Demo account reset to $10,000')
   }
-  const potentialPayout = stake * 1.9
 
   const runDeepScan = async () => {
     setAiScanning(true); setAiScanProgress(0); setAiScannedMarkets([])
@@ -576,7 +589,6 @@ export default function HomePage() {
     'Volatility 10 (1s) Index', 'Volatility 10 Index',
   ]
 
-  // Update phone number function
   const handleUpdatePhone = async () => {
     if (!newPhoneNumber || newPhoneNumber.length < 10) {
       alert("Please enter a valid phone number")
@@ -601,7 +613,6 @@ export default function HomePage() {
     return (
       <main className="min-h-screen bg-[#f8f9fc] text-gray-900 font-sans overflow-hidden">
         
-        {/* HEADER */}
         <header className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between relative z-10">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-[#7c3aed] flex items-center justify-center shadow-lg shadow-purple-500/30">
@@ -622,7 +633,6 @@ export default function HomePage() {
           </div>
         </header>
 
-        {/* HERO SECTION */}
         <section className="relative max-w-7xl mx-auto px-6 pt-12 pb-24 lg:pt-20">
           <div className="absolute top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
             <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[50%] rounded-full bg-purple-300/30 blur-[100px]" />
@@ -678,7 +688,6 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* LIVE TICKER TAPE */}
         <div className="border-y border-gray-200 bg-white overflow-hidden py-3 flex items-center">
           <div className="flex items-center gap-8 animate-[marquee_20s_linear_infinite] whitespace-nowrap px-4 opacity-80">
             <div className="flex items-center gap-2 text-sm"><span className="text-gray-500">Naomi A.</span> <span className="text-gray-900">won</span> <span className="text-emerald-500 font-semibold">$0.45</span> <span className="text-gray-500">on V10</span></div>
@@ -689,7 +698,6 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* AVAILABLE MARKETS */}
         <section className="bg-[#f8f9fc] py-8 text-center max-w-5xl mx-auto px-6">
           <div className="text-xs uppercase tracking-widest font-bold text-gray-400 mb-4">Available Markets</div>
           <div className="flex flex-wrap justify-center gap-2">
@@ -701,7 +709,6 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* FEATURES */}
         <section className="bg-gray-50 py-24">
           <div className="max-w-7xl mx-auto px-6">
             <div className="text-center mb-16">
@@ -729,7 +736,6 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* 3 STEPS */}
         <section className="py-24 bg-white">
           <div className="max-w-7xl mx-auto px-6">
             <div className="text-center mb-16">
@@ -756,7 +762,6 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* FOOTER */}
         <footer className="bg-[#f8f9fc] border-t border-gray-200 py-12">
           <div className="max-w-7xl mx-auto px-6 text-center">
             <div className="flex items-center justify-center gap-2 mb-6">
@@ -781,275 +786,12 @@ export default function HomePage() {
     )
   }
 
-  const kesAmount = (stake * 130).toLocaleString()
   const userInitial = user?.email ? user.email[0].toUpperCase() : 'U'
   const accountNumber = user?.id ? `ST-${user.id.slice(0, 6).toUpperCase()}` : 'ST-000000'
-  const memberSince = user?.created_at ? new Date(user.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'October 2026'
-  const userEmail = user?.email || 'user@example.com'
-  const fullName = user?.user_metadata?.full_name || userEmail.split('@')[0].toUpperCase()
-  const phoneNumber = user?.user_metadata?.phone || user?.phone || null
-  
-  const totalDeposited = liveBalance;
-  const totalWithdrawn = 0;
-  const totalTrades = closedPositions.length;
-  const totalWins = closedPositions.filter(p => p.result === 'WIN').length;
-  const winRate = totalTrades > 0 ? Math.round((totalWins / totalTrades) * 100) : 0;
-  const netPnl = closedPositions.reduce((sum, p) => sum + p.payout, 0);
 
-  // ═══════════════════════════════════════════════════════
-  // PROFILE PAGE
-  // ═══════════════════════════════════════════════════════
-  if (showProfile) {
-    return (
-      <main className={`min-h-screen pb-20 ${isDark ? 'bg-[#0a0613] text-white' : 'bg-gray-50 text-gray-900'}`}>
-        
-        <nav className={`border-b sticky top-0 z-30 ${isDark ? 'border-[#1f1433] bg-[#0d0818]' : 'border-gray-200 bg-white'}`}>
-          <div className="px-4 md:px-6 py-3 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center">
-                <span className="text-white font-bold text-sm italic">~</span>
-              </div>
-              <span className={`font-bold hidden sm:inline text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>DerivEngine</span>
-            </div>
-
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <button
-                onClick={() => setTheme(isDark ? 'light' : 'dark')}
-                className={`w-8 h-8 rounded-full flex items-center justify-center transition ${isDark ? 'bg-white/5 text-gray-400 hover:bg-white/10' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-              >
-                {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-              </button>
-              <button
-                onClick={() => { setWalletTab('deposit'); setIsWalletOpen(true); setIsLiveMode(true) }}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold bg-purple-600 hover:bg-purple-700 text-white"
-              >
-                <ArrowDownToLine className="w-4 h-4" /> Deposit
-              </button>
-              <div className="w-9 h-9 rounded-full bg-purple-600 flex items-center justify-center text-white font-bold text-sm ml-1">
-                {userInitial}
-              </div>
-            </div>
-          </div>
-        </nav>
-
-        <div className="px-4 md:px-6 py-6 max-w-2xl mx-auto space-y-4">
-          
-          <div className={`rounded-3xl border p-6 ${isDark ? 'bg-[#130a21] border-[#2a1b40]' : 'bg-white border-gray-200'}`}>
-            <div className="flex items-start gap-4 mb-6">
-              <div className="w-16 h-16 rounded-2xl bg-purple-600 flex items-center justify-center text-white font-bold text-2xl shadow-lg shadow-purple-500/30">
-                {userInitial}
-              </div>
-              <div className="flex-1 min-w-0">
-                <h2 className={`text-xl font-bold truncate ${isDark ? 'text-white' : 'text-gray-900'}`}>{fullName}</h2>
-                <p className={`text-sm truncate ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{userEmail}</p>
-                <div className="flex items-center gap-2 mt-2">
-                  <span className="text-xs font-bold text-gray-400">ACCOUNT NO.</span>
-                  <span className={`text-sm font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{accountNumber}</span>
-                  <button onClick={() => copyToClipboard(accountNumber)} className="text-gray-400 hover:text-gray-600">
-                    <Copy className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${isLiveMode ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20'}`}>
-              <ShieldCheck className="w-3.5 h-3.5" /> {isLiveMode ? 'Live account' : 'Demo account'}
-            </div>
-          </div>
-
-          <div className={`rounded-3xl border p-6 ${isDark ? 'bg-[#130a21] border-[#2a1b40]' : 'bg-white border-gray-200'}`}>
-            <h3 className={`font-bold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>Account details</h3>
-            <div className="space-y-4">
-              <div className="flex items-center gap-4">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? 'bg-[#1f1433]' : 'bg-gray-100'}`}>
-                  <Mail className="w-4 h-4 text-gray-400" />
-                </div>
-                <div>
-                  <div className="text-xs text-gray-500 font-semibold">EMAIL</div>
-                  <div className={`text-sm font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>{userEmail}</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? 'bg-[#1f1433]' : 'bg-gray-100'}`}>
-                  <Globe className="w-4 h-4 text-gray-400" />
-                </div>
-                <div>
-                  <div className="text-xs text-gray-500 font-semibold">COUNTRY</div>
-                  <div className={`text-sm font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>🇰🇪 Kenya</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? 'bg-[#1f1433]' : 'bg-gray-100'}`}>
-                  <Hash className="w-4 h-4 text-gray-400" />
-                </div>
-                <div>
-                  <div className="text-xs text-gray-500 font-semibold">ACCOUNT NUMBER</div>
-                  <div className={`text-sm font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>{accountNumber}</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? 'bg-[#1f1433]' : 'bg-gray-100'}`}>
-                  <Calendar className="w-4 h-4 text-gray-400" />
-                </div>
-                <div>
-                  <div className="text-xs text-gray-500 font-semibold">MEMBER SINCE</div>
-                  <div className={`text-sm font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>{memberSince}</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? 'bg-[#1f1433]' : 'bg-gray-100'}`}>
-                  <TrendingUp className="w-4 h-4 text-gray-400" />
-                </div>
-                <div>
-                  <div className="text-xs text-gray-500 font-semibold">BALANCE</div>
-                  <div className={`text-sm font-medium text-emerald-500`}>${balance.toFixed(2)}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className={`rounded-3xl border p-6 ${isDark ? 'bg-[#130a21] border-[#2a1b40]' : 'bg-white border-gray-200'}`}>
-            <div className="flex justify-between items-center mb-4">
-              <h3 className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>Phone number</h3>
-              
-              {phoneNumber ? (
-                <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                  <ShieldCheck className="w-3 h-3" /> Verified
-                </div>
-              ) : (
-                <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-500/10 text-red-500 border border-red-500/20">
-                  <AlertCircle className="w-3 h-3" /> Missing
-                </div>
-              )}
-            </div>
-            
-            <div className="flex items-start gap-4 mb-4">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isDark ? 'bg-[#1f1433]' : 'bg-gray-100'}`}>
-                <Phone className="w-4 h-4 text-purple-500" />
-              </div>
-              <div>
-                <div className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                  {phoneNumber || 'Not set'}
-                </div>
-                <div className="text-xs text-gray-500 mt-1">Used to authorize your M-Pesa deposits & withdrawals.</div>
-              </div>
-            </div>
-            <button 
-              onClick={() => {
-                setNewPhoneNumber(phoneNumber || '');
-                setIsPhoneModalOpen(true);
-              }}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold border transition ${isDark ? 'border-[#2a1b40] hover:bg-white/5' : 'border-gray-200 hover:bg-gray-50'}`}
-            >
-              Change number
-            </button>
-          </div>
-
-          <div className={`rounded-3xl border p-6 ${isDark ? 'bg-[#130a21] border-[#2a1b40]' : 'bg-white border-gray-200'}`}>
-            <h3 className={`font-bold mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>Your trading</h3>
-            <div className="grid grid-cols-2 gap-3">
-              <div className={`p-4 rounded-xl border ${isDark ? 'bg-[#1a1126] border-[#2a1b40]' : 'bg-gray-50 border-gray-100'}`}>
-                <div className="text-[10px] text-gray-500 font-bold tracking-wider mb-1">DEPOSITED</div>
-                <div className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>${totalDeposited.toFixed(2)}</div>
-              </div>
-              <div className={`p-4 rounded-xl border ${isDark ? 'bg-[#1a1126] border-[#2a1b40]' : 'bg-gray-50 border-gray-100'}`}>
-                <div className="text-[10px] text-gray-500 font-bold tracking-wider mb-1">WITHDRAWN</div>
-                <div className={`text-xl font-bold text-yellow-500`}>${totalWithdrawn.toFixed(2)}</div>
-              </div>
-              <div className={`p-4 rounded-xl border ${isDark ? 'bg-[#1a1126] border-[#2a1b40]' : 'bg-gray-50 border-gray-100'}`}>
-                <div className="text-[10px] text-gray-500 font-bold tracking-wider mb-1">TRADES</div>
-                <div className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{totalTrades}</div>
-              </div>
-              <div className={`p-4 rounded-xl border ${isDark ? 'bg-[#1a1126] border-[#2a1b40]' : 'bg-gray-50 border-gray-100'}`}>
-                <div className="text-[10px] text-gray-500 font-bold tracking-wider mb-1">WIN RATE</div>
-                <div className={`text-xl font-bold text-purple-500`}>{winRate}%</div>
-              </div>
-              <div className={`p-4 rounded-xl border ${isDark ? 'bg-[#1a1126] border-[#2a1b40]' : 'bg-gray-50 border-gray-100'}`}>
-                <div className="text-[10px] text-gray-500 font-bold tracking-wider mb-1">WINS</div>
-                <div className={`text-xl font-bold text-emerald-500`}>{totalWins}</div>
-              </div>
-              <div className={`p-4 rounded-xl border ${isDark ? 'bg-[#1a1126] border-[#2a1b40]' : 'bg-gray-50 border-gray-100'}`}>
-                <div className="text-[10px] text-gray-500 font-bold tracking-wider mb-1">NET P&L</div>
-                <div className={`text-xl font-bold ${netPnl >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                  {netPnl >= 0 ? '+' : ''}${netPnl.toFixed(2)}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <button onClick={handleLogout} className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-bold text-sm transition ${isDark ? 'bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20' : 'bg-red-50 text-red-500 border border-red-100 hover:bg-red-100'}`}>
-            <LogOut className="w-4 h-4" /> Log out
-          </button>
-
-        </div>
-
-        <div className={`fixed bottom-0 left-0 right-0 z-30 border-t md:hidden ${isDark ? 'bg-[#0d0818] border-[#1f1433]' : 'bg-white border-gray-200'}`}>
-          <div className="grid grid-cols-5 py-2">
-            <button onClick={() => setShowProfile(false)} className={`flex flex-col items-center gap-0.5 py-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-              <TrendingUp className="w-5 h-5" />
-              <span className="text-[10px]">Trade</span>
-            </button>
-            <button onClick={() => { setWalletTab('deposit'); setIsWalletOpen(true); setIsLiveMode(true) }} className={`flex flex-col items-center gap-0.5 py-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-              <Wallet className="w-5 h-5" />
-              <span className="text-[10px]">Wallet</span>
-            </button>
-            <Link href="/history" className={`flex flex-col items-center gap-0.5 py-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-              <History className="w-5 h-5" />
-              <span className="text-[10px]">History</span>
-            </Link>
-            <button className={`flex flex-col items-center gap-0.5 py-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-              <Gift className="w-5 h-5" />
-              <span className="text-[10px]">Refer</span>
-            </button>
-            <button onClick={handleLogout} className={`flex flex-col items-center gap-0.5 py-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-              <LogOut className="w-5 h-5" />
-              <span className="text-[10px]">Log out</span>
-            </button>
-          </div>
-        </div>
-
-        {isPhoneModalOpen && (
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-            <div className={`w-full max-w-sm rounded-2xl border p-6 ${isDark ? 'bg-[#0d0818] border-purple-500/20' : 'bg-white border-gray-200'}`}>
-              <h3 className={`font-bold text-lg mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>Change Phone Number</h3>
-              <div className="mb-4">
-                <label className={`text-xs block mb-2 font-semibold ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>New Phone Number</label>
-                <input 
-                  type="tel" 
-                  value={newPhoneNumber} 
-                  onChange={(e) => setNewPhoneNumber(e.target.value)} 
-                  placeholder="0712 345 678"
-                  className={`w-full rounded-lg px-4 py-3 outline-none border text-sm ${isDark ? 'bg-[#150d24] text-white border-purple-500/20 focus:border-purple-500' : 'bg-gray-50 text-gray-900 border-gray-200 focus:border-purple-500'}`} 
-                />
-              </div>
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => setIsPhoneModalOpen(false)} 
-                  className={`flex-1 py-2.5 rounded-lg font-semibold text-sm ${isDark ? 'bg-[#150d24] text-white' : 'bg-gray-100 text-gray-700'}`}
-                >
-                  Cancel
-                </button>
-                <button 
-                  onClick={handleUpdatePhone} 
-                  disabled={isUpdatingPhone}
-                  className="flex-1 py-2.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg font-bold text-sm"
-                >
-                  {isUpdatingPhone ? 'Saving...' : 'Save'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </main>
-    )
-  }
-
-  // ═══════════════════════════════════════════════════════
-  // DASHBOARD
-  // ═══════════════════════════════════════════════════════
   return (
     <main className="min-h-screen pb-20 md:pb-0 bg-[#f8f9fc] text-gray-900">
 
-      {/* ── TOP BAR ───────────────────────────── */}
       <nav className="border-b border-gray-200 bg-white sticky top-0 z-30">
         <div className="px-4 md:px-6 py-2 flex items-center justify-between gap-3">
           
@@ -1131,7 +873,7 @@ export default function HomePage() {
                       </div>
                     </button>
                     <div className="h-px bg-gray-100" />
-                    <button onClick={() => { setIsAccountDropdownOpen(false); setShowProfile(true); }} className="w-full flex items-center gap-3 px-4 py-3 transition hover:bg-gray-50">
+                    <Link href="/profile" className="w-full flex items-center gap-3 px-4 py-3 transition hover:bg-gray-50">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center bg-gray-100">
                         <span className="text-blue-500 text-sm">👤</span>
                       </div>
@@ -1141,7 +883,7 @@ export default function HomePage() {
                         </div>
                         <div className="text-[11px] text-gray-500">Account details & logout</div>
                       </div>
-                    </button>
+                    </Link>
                   </div>
                 </>
               )}
@@ -1154,12 +896,12 @@ export default function HomePage() {
               <ArrowUpFromLine className="w-4 h-4" /> Withdraw
             </button>
 
-            <button 
-              onClick={() => setShowProfile(true)}
+            <Link 
+              href="/profile"
               className="w-9 h-9 rounded-full bg-purple-600 flex items-center justify-center text-white font-bold text-sm hover:bg-purple-700 transition"
             >
               {userInitial}
-            </button>
+            </Link>
             
             <button
               onClick={() => setTheme(isDark ? 'light' : 'dark')}
@@ -1175,10 +917,8 @@ export default function HomePage() {
         </div>
       </nav>
 
-      {/* ── MAIN LAYOUT ───────────────────────────── */}
       <div className="px-4 py-4 grid grid-cols-1 lg:grid-cols-12 gap-4 max-w-[1600px] mx-auto">
 
-        {/* Left Panel: Positions */}
         <div className="hidden lg:block lg:col-span-2 rounded-2xl border p-4 bg-white border-gray-200">
           <div className="flex gap-2 mb-4">
             <button onClick={() => setActiveTab('open')} className={`flex-1 py-2 rounded-lg text-xs font-medium ${activeTab === 'open' ? 'bg-purple-100 text-purple-700' : 'text-gray-500'}`}>Open ({openPositions.length})</button>
@@ -1190,7 +930,6 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Center Panel: Chart & Digits */}
         <div className="lg:col-span-7 space-y-4">
           
           <div className="rounded-2xl border p-4 bg-white border-gray-200">
@@ -1236,7 +975,6 @@ export default function HomePage() {
             <div ref={chartRef} className="w-full rounded-lg overflow-hidden" style={{ height: '320px' }} />
           </div>
 
-          {/* Digits Row */}
           <div className="rounded-2xl border p-4 bg-white border-gray-200">
             <div className="flex justify-between items-center mb-4">
               <div className="text-xs font-bold text-gray-600">
@@ -1270,18 +1008,15 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Right Panel: Trade Controls */}
         <div className="lg:col-span-3 space-y-4">
           <div className="rounded-2xl border p-4 bg-white border-gray-200">
             
-            {/* Mode Toggle */}
             <div className="grid grid-cols-3 gap-1 p-1 rounded-xl mb-4 bg-gray-100">
               <button onClick={() => setTradeMode('manual')} className={`py-2 rounded-lg text-xs font-semibold transition ${tradeMode === 'manual' ? 'bg-purple-600 text-white shadow' : 'text-gray-500'}`}>Manual</button>
               <button onClick={() => setTradeMode('auto')} className={`py-2 rounded-lg text-xs font-semibold transition ${tradeMode === 'auto' ? 'bg-purple-600 text-white shadow' : 'text-gray-500'}`}>Auto</button>
               <button onClick={() => setTradeMode('ai')} className={`py-2 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1 ${tradeMode === 'ai' ? 'bg-purple-600 text-white shadow' : 'text-gray-500'}`}>✨ AI</button>
             </div>
 
-            {/* Trade Type Toggle */}
             <div className="grid grid-cols-3 gap-2 mb-4">
               <button onClick={() => setTradeType('rise-fall')} className={`py-2 rounded-xl text-xs font-semibold border transition ${tradeType === 'rise-fall' ? 'bg-purple-600 text-white border-purple-600' : 'bg-gray-50 text-gray-600 border-gray-200'}`}>Rise/Fall</button>
               <button onClick={() => setTradeType('digits')} className={`py-2 rounded-xl text-xs font-semibold border transition ${tradeType === 'digits' ? 'bg-purple-600 text-white border-purple-600' : 'bg-gray-50 text-gray-600 border-gray-200'}`}>Digits</button>
@@ -1290,7 +1025,6 @@ export default function HomePage() {
               )}
             </div>
 
-            {/* Stake Input */}
             <div className="flex justify-between items-center mb-2">
               <span className="text-xs font-semibold text-gray-600">Stake (USD)</span>
               <div className="flex items-center gap-1 text-xs text-gray-500">
@@ -1313,7 +1047,6 @@ export default function HomePage() {
               ≈ KES {(stake * 130).toLocaleString()}
             </div>
 
-            {/* Quick Stakes */}
             <div className="grid grid-cols-6 gap-1 mb-4">
               {[1, 5, 10, 25, 50, 100].map((val) => (
                 <button key={val} onClick={() => setStake(val)}
@@ -1323,7 +1056,6 @@ export default function HomePage() {
               ))}
             </div>
 
-            {/* Manual: Digits */}
             {tradeMode === 'manual' && tradeType === 'digits' && (
               <>
                 <div className="grid grid-cols-3 gap-2 mb-3">
@@ -1397,7 +1129,6 @@ export default function HomePage() {
               </>
             )}
 
-            {/* Manual: Rise/Fall */}
             {tradeMode === 'manual' && tradeType === 'rise-fall' && (
               <div className="grid grid-cols-2 gap-2 mt-4">
                 <button onClick={() => executeTrade('UP')} disabled={isTrading}
@@ -1419,7 +1150,6 @@ export default function HomePage() {
               </div>
             )}
 
-            {/* Manual: Multipliers */}
             {tradeMode === 'manual' && tradeType === 'multipliers' && (
               <div className="mt-4 space-y-3">
                 <div>
@@ -1452,7 +1182,6 @@ export default function HomePage() {
               </div>
             )}
 
-            {/* Auto: Bot Controls */}
             {tradeMode === 'auto' && (
               <div className="mt-2 space-y-3">
                 <div>
@@ -1519,9 +1248,6 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* ═══════════════════════════════════════════
-          WALLET MODAL
-      ═══════════════════════════════════════════ */}
       {isWalletOpen && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
           <div className={`w-full max-w-md rounded-2xl border bg-white border-gray-200 max-h-[90vh] overflow-y-auto`}>
@@ -1556,7 +1282,6 @@ export default function HomePage() {
                 <button onClick={() => { setPaymentMethod('crypto'); setWalletMessage(null) }} className={`flex-1 py-3 rounded-lg text-sm font-semibold transition ${paymentMethod === 'crypto' ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-600'}`}>₿ Crypto</button>
               </div>
 
-              {/* DEPOSIT */}
               {walletTab === 'deposit' && (
                 <>
                   <div className="mb-4">
@@ -1620,7 +1345,6 @@ export default function HomePage() {
                 </>
               )}
 
-              {/* WITHDRAW */}
               {walletTab === 'withdraw' && (
                 <>
                   <div className="mb-4">
@@ -1659,9 +1383,6 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* ═══════════════════════════════════════════
-          AI SCANNER MODAL
-      ═══════════════════════════════════════════ */}
       {tradeMode === 'ai' && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
           <div className="w-full max-w-md rounded-2xl border bg-white border-gray-200">
